@@ -14,17 +14,15 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --paper: #f8f8f8;
-      --ink: #0a0a0a;
+      --ink: #e8e8e8;
       --faint: #8a8a8a;
-      --rule: #d4d4d4;
-      --accent: #1a1a1a;
+      --accent: #ffffff;
     }
 
     html, body { height: 100%; }
 
     body {
-      background: var(--paper);
+      background: #000;
       font-family: 'Georgia', 'Times New Roman', serif;
       color: var(--ink);
       display: flex;
@@ -39,9 +37,8 @@
     #chaosCanvas {
       position: fixed;
       top: 0; left: 0;
-      width: 100%; height: 100%;
+      width: 100vw; height: 100vh;
       z-index: 0;
-      opacity: 0.25;
     }
 
     .wrap {
@@ -69,33 +66,32 @@
     }
 
     .card {
-      background: rgba(255,255,255,0.85);
-      border: 1.5px solid var(--ink);
+      background: rgba(20,20,20,0.80);
+      border: 1px solid rgba(255,255,255,0.25);
       padding: 40px 28px;
-      box-shadow: 2px 2px 0 var(--ink);
     }
 
     .card p {
       font-size: 0.95rem;
       line-height: 1.8;
-      color: var(--accent);
+      color: var(--faint);
       margin-bottom: 24px;
     }
 
     .btn {
       display: inline-block;
       padding: 12px 40px;
-      background: var(--ink);
-      color: #fff;
-      border: none;
+      background: rgba(255,255,255,0.12);
+      color: var(--ink);
+      border: 1px solid rgba(255,255,255,0.3);
       font-family: 'Georgia', serif;
       font-size: 1rem;
       letter-spacing: 0.05em;
       cursor: pointer;
       text-decoration: none;
-      transition: opacity 0.15s;
+      transition: background 0.15s;
     }
-    .btn:hover { opacity: 0.8; }
+    .btn:hover { background: rgba(255,255,255,0.2); }
 
     .status {
       margin-top: 20px;
@@ -125,72 +121,96 @@
 </div>
 
 <script>
+/* de Jong attractor — WebGL particle field
+   Adapted from qc20/dejong-attractor (MIT-compatible) */
 (function(){
   const canvas = document.getElementById('chaosCanvas');
-  const ctx = canvas.getContext('2d');
-  let W, H, animId;
+  const gl = canvas.getContext('webgl', {alpha: false}) ||
+             canvas.getContext('experimental-webgl', {alpha: false});
+  if (!gl) return;
 
-  function resize() {
-    W = canvas.width  = window.innerWidth;
-    H = canvas.height = window.innerHeight;
+  /* ── shaders ── */
+  const vertSrc = `
+    attribute vec2 a_pos;
+    uniform float u_time;
+    uniform vec2 u_res;
+    void main() {
+      float a = -2.0 + sin(u_time / 8000.0);
+      float b = -2.0 + cos(u_time / 12000.0) * 0.3;
+      float c = -1.2 + sin(u_time / 10000.0) * 0.2;
+      float d =  2.0 + cos(u_time / 9000.0)  * 0.3;
+
+      vec2 p = a_pos;
+      for (int i = 0; i < 80; i++) {
+        float x = sin(a * p.y) - cos(b * p.x);
+        float y = sin(c * p.x) - cos(d * p.y);
+        p = vec2(x, y);
+      }
+      vec2 screen = (p * 0.45 + 0.5) * u_res;
+      gl_Position = vec4((screen / u_res) * 2.0 - 1.0, 0.0, 1.0);
+      gl_PointSize = 1.0;
+    }`;
+
+  const fragSrc = `
+    precision mediump float;
+    void main() {
+      gl_FragColor = vec4(1.0, 1.0, 1.0, 0.06);
+    }`;
+
+  /* ── compile ── */
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    return s;
   }
-  resize();
-  window.addEventListener('resize', resize);
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, vertSrc));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fragSrc));
+  gl.linkProgram(prog);
 
-  /* Lorenz attractor particles */
-  const N = 200;
-  let particles = [];
-  const sigma = 10, rho = 28, beta = 8/3;
-  const dt = 0.003;
+  const aPos = gl.getAttribLocation(prog, 'a_pos');
+  const uTime = gl.getUniformLocation(prog, 'u_time');
+  const uRes  = gl.getUniformLocation(prog, 'u_res');
 
-  function reset() {
-    particles = [];
-    for (let i = 0; i < N; i++) {
-      particles.push({
-        x: 0.1 + Math.random() * 10,
-        y: 0.1 + Math.random() * 10,
-        z: 20 + Math.random() * 10,
-        trail: []
-      });
+  /* ── 262K particles ── */
+  const N = 1 << 18;
+  const pos = new Float32Array(N * 2);
+  for (let i = 0; i < pos.length; i++) pos[i] = Math.random() * 2 - 1;
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, pos, gl.STATIC_DRAW);
+
+  /* ── render loop ── */
+  function resize() {
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w; canvas.height = h;
     }
   }
-  reset();
 
-  function lorenzStep(p) {
-    const dx = sigma * (p.y - p.x) * dt;
-    const dy = (p.x * (rho - p.z) - p.y) * dt;
-    const dz = (p.x * p.y - beta * p.z) * dt;
-    p.x += dx;
-    p.y += dy;
-    p.z += dz;
-    const sx = (p.x - 20) * 6  + W/2;
-    const sy = (p.y - 25) * 5  + H/2;
-    p.trail.push({ x: sx, y: sy });
-    if (p.trail.length > 80) p.trail.shift();
-    return { sx, sy };
+  function tick(ms) {
+    resize();
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.useProgram(prog);
+    gl.uniform1f(uTime, ms);
+    gl.uniform2f(uRes, canvas.width, canvas.height);
+
+    gl.enableVertexAttribArray(aPos);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+    gl.drawArrays(gl.POINTS, 0, N);
+    requestAnimationFrame(tick);
   }
 
-  function tick() {
-    ctx.clearRect(0, 0, W, H);
-    particles.forEach(p => {
-      const { sx, sy } = lorenzStep(p);
-      if (p.trail.length < 2) return;
-      ctx.beginPath();
-      ctx.moveTo(p.trail[0].x, p.trail[0].y);
-      for (let i = 1; i < p.trail.length; i++) {
-        ctx.lineTo(p.trail[i].x, p.trail[i].y);
-      }
-      const alpha = 0.03;
-      ctx.strokeStyle = `rgba(10,10,10,${alpha})`;
-      ctx.lineWidth = 0.6;
-      ctx.stroke();
-    });
-    animId = requestAnimationFrame(tick);
-  }
-
-  tick();
-
-  canvas.addEventListener('click', () => reset());
+  requestAnimationFrame(tick);
 })();
 </script>
 
