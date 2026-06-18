@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mathbarker — Review</title>
+  <link rel="icon" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#faf7f0;--ink:#2a2a2a;--faint:#999;--line:rgba(0,0,0,0.04);--border:rgba(0,0,0,0.06);--dash:rgba(0,0,0,0.10);--correct:#2a6e2a;--wrong:#8a2a2a;--row-hover:rgba(0,0,0,0.02)}
+    :root.dark{--bg:#0d0d0d;--ink:#d8d8d8;--faint:#4a4a4a;--line:rgba(255,255,255,0.016);--border:rgba(255,255,255,0.05);--dash:rgba(255,255,255,0.08);--correct:#5cba5c;--wrong:#c85a5a;--row-hover:rgba(255,255,255,0.015)}
+    html,body{height:100%}
+    body{background:var(--bg);font-family:'Caveat',cursive;color:var(--ink);min-height:100vh;transition:background 0.4s,color 0.4s;display:flex;flex-direction:column;align-items:center}
+    .wrap{width:100%;max-width:520px;padding:32px 24px 48px}
+    .hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px}
+    .back{color:var(--faint);text-decoration:none;font-size:0.85rem}.back:hover{color:var(--ink)}
+    .hd-badge{font-size:0.7rem;font-weight:600;letter-spacing:0.1em;color:var(--faint)}
+    .themetg{background:none;border:1px solid var(--border);border-radius:20px;width:34px;height:20px;cursor:pointer;position:relative;background:var(--bg)}
+    .themetg::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--ink);transition:transform 0.3s}
+    :root.dark .themetg::after{transform:translateX(14px)}
+    .counter{text-align:center;font-size:0.7rem;color:var(--faint);letter-spacing:0.08em;margin-bottom:24px}
+    .q-card{border:1px solid var(--border);padding:36px 28px 28px}
+    .q-text{font-size:1.2rem;line-height:1.8;margin-bottom:28px}
+    .answer-row{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+    .answer-input{width:100px;background:none;border:none;border-bottom:1.5px dashed var(--dash);padding:8px 4px;font-family:'Caveat',cursive;font-size:1.3rem;font-weight:600;color:var(--ink);outline:none;-webkit-appearance:none}
+    .answer-input:focus{border-bottom-color:var(--faint)}
+    .answer-input.correct{border-bottom-color:var(--correct);color:var(--correct)}
+    .answer-input.wrong{border-bottom-color:var(--wrong);color:var(--wrong)}
+    .submit-btn{padding:8px 24px;background:none;border:1px solid var(--border);font-family:'Caveat',cursive;font-size:0.95rem;color:var(--ink);cursor:pointer}
+    .submit-btn:hover{border-color:var(--dash);background:var(--row-hover)}
+    .feedback{font-size:0.85rem;margin-bottom:12px;min-height:1.2em}
+    .feedback.correct{color:var(--correct)}.feedback.wrong{color:var(--wrong)}
+    .exp{margin-top:18px;padding:14px 16px;border-left:2px solid var(--dash);font-size:0.82rem;line-height:1.7;color:var(--faint);display:none}
+    .exp.show{display:block}
+    .nav-row{display:flex;justify-content:space-between;margin-top:24px}
+    .nav-btn{padding:8px 20px;background:none;border:1px solid var(--border);font-family:'Caveat',cursive;font-size:0.9rem;color:var(--ink);cursor:pointer}
+    .nav-btn:hover{border-color:var(--dash)}.nav-btn:disabled{opacity:0.3}
+    .result{text-align:center;padding:48px 24px}
+    .result-num{font-size:3rem;font-weight:700;margin-bottom:8px}
+    .result-label{font-size:0.8rem;color:var(--faint);letter-spacing:0.06em;margin-bottom:28px}
+    .stats{font-size:0.78rem;color:var(--faint);line-height:1.8}
+    .empty{text-align:center;padding:56px 0;color:var(--faint);font-size:0.9rem}
+    .loading{text-align:center;padding:56px 0;color:var(--faint);font-size:0.9rem}
+    [hidden]{display:none!important}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hd">
+    <a class="back" href="/">← mathbarker</a>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span class="hd-badge">REVIEW</span>
+      <button class="themetg" id="themeToggle"></button>
+    </div>
+  </header>
+
+  <div id="quizArea" hidden>
+    <div class="counter" id="counter"></div>
+    <div class="q-card">
+      <div class="q-text" id="qText"></div>
+      <div class="answer-row">
+        <input class="answer-input" id="answerInput" type="text" inputmode="numeric" autocomplete="off" placeholder="?">
+        <button class="submit-btn" id="submitBtn">submit</button>
+      </div>
+      <div class="feedback" id="feedback"></div>
+      <div class="exp" id="exp"></div>
+    </div>
+    <div class="nav-row">
+      <button class="nav-btn" id="prevBtn" disabled>Previous</button>
+      <button class="nav-btn" id="nextBtn">Next</button>
+    </div>
+  </div>
+
+  <div id="resultArea" hidden>
+    <div class="result">
+      <div class="result-num" id="resultScore"></div>
+      <div class="result-label" id="resultLabel"></div>
+      <div class="stats" id="statsArea"></div>
+      <button class="submit-btn" onclick="location.reload()">Again</button>
+      <a class="back" href="/" style="display:block;margin-top:16px">← home</a>
+    </div>
+  </div>
+
+  <div class="loading" id="loading">Loading...</div>
+  <div class="empty" id="empty" hidden>Nothing to review. All clear.</div>
+</div>
+
+<script>(function(){const h=document.documentElement;const s=localStorage.getItem('mathbarker-theme');if(s==='dark'||(!s&&matchMedia('(prefers-color-scheme:dark)').matches))h.classList.add('dark');document.getElementById('themeToggle').addEventListener('click',()=>{h.classList.toggle('dark');localStorage.setItem('mathbarker-theme',h.classList.contains('dark')?'dark':'light');});})();</script>
+<script src="/ques.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script>
+(async function(){
+  const questions = await loadReviewQuestions();
+  if (!questions.length) {
+    document.getElementById('loading').hidden = true;
+    document.getElementById('empty').hidden = false;
+    return;
+  }
+  document.getElementById('loading').hidden = true;
+  document.getElementById('quizArea').hidden = false;
+
+  let idx = 0, answers = [], startTime;
+  const qText = document.getElementById('qText');
+  const answerInput = document.getElementById('answerInput');
+  const submitBtn = document.getElementById('submitBtn');
+  const feedback = document.getElementById('feedback');
+  const exp = document.getElementById('exp');
+  const counter = document.getElementById('counter');
+
+  function renderKaTeX(el){if(window.renderMathInElement)renderMathInElement(el,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})}
+
+  function showQuestion(){
+    const q = questions[idx]; const prev = answers[idx];
+    qText.textContent = q.q;
+    counter.textContent = (idx+1)+' / '+questions.length;
+    exp.innerHTML='';exp.classList.remove('show');
+    feedback.textContent='';feedback.className='feedback';
+    answerInput.className='answer-input';
+    answerInput.disabled=false;submitBtn.disabled=false;
+    answerInput.value=prev?prev.userAnswer:'';
+    answerInput.focus();
+    document.getElementById('prevBtn').disabled=idx===0;
+    document.getElementById('nextBtn').textContent=idx+1<questions.length?'Next':'Finish';
+    startTime=Date.now();
+    renderKaTeX(qText);
+  }
+
+  function submit(){
+    const q=questions[idx];if(answers[idx])return;
+    const num=parseInt(answerInput.value.trim(),10);
+    if(isNaN(num)){feedback.textContent='number please';feedback.className='feedback wrong';return}
+    const isCorrect=num===q.answer;
+    answers[idx]={userAnswer:String(num),isCorrect,timeMs:Date.now()-startTime};
+    feedback.textContent=isCorrect?'correct':('expected '+q.answer);
+    feedback.className='feedback '+(isCorrect?'correct':'wrong');
+    answerInput.className='answer-input '+(isCorrect?'correct':'wrong');
+    answerInput.disabled=true;submitBtn.disabled=true;
+    if(q.explanation){exp.innerHTML=q.explanation;exp.classList.add('show');renderKaTeX(exp)}
+    recordAnswer(q,num,isCorrect,answers[idx].timeMs);
+  }
+
+  function next(){if(!answers[idx])return;if(idx+1>=questions.length){showResult();return}idx++;showQuestion()}
+  function prev(){if(idx>0){idx--;showQuestion()}}
+
+  async function showResult(){
+    document.getElementById('quizArea').hidden=true;
+    document.getElementById('resultArea').hidden=false;
+    const correct=answers.filter(a=>a&&a.isCorrect).length;
+    document.getElementById('resultScore').textContent=correct+'/'+questions.length;
+    document.getElementById('resultLabel').textContent=correct===questions.length?'all corrected!':correct>0?'good':'try again';
+    const stats=await fetchStats();
+    if(stats&&stats.total>0){
+      document.getElementById('statsArea').innerHTML='all time: '+stats.total+' solved, '+Math.round(stats.correct/stats.total*100)+'% correct, avg '+(stats.avg_time_ms/1000).toFixed(1)+'s';
+    }
+  }
+
+  submitBtn.addEventListener('click',submit);
+  document.getElementById('nextBtn').addEventListener('click',next);
+  document.getElementById('prevBtn').addEventListener('click',prev);
+  answerInput.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.preventDefault();submit()}
+    if(e.key==='ArrowRight'&&answers[idx]){next()}
+    if(e.key==='ArrowLeft'){prev()}
+  });
+
+  showQuestion();
+})();
+</script>
+</body>
+</html>

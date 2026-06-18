@@ -26,6 +26,9 @@ export default {
     if (url.pathname === '/api/stats' && request.method === 'GET') {
       return handleStats(request, env);
     }
+    if (url.pathname === '/api/review' && request.method === 'GET') {
+      return handleReview(request, env);
+    }
 
     /* ── admin auth ── */
     if (url.pathname === '/api/admin/login' && request.method === 'POST') {
@@ -36,6 +39,12 @@ export default {
     const p = url.pathname.toLowerCase();
     if (p.startsWith('/level/')) {
       return env.ASSETS.fetch(new URL('/level.html', request.url).toString());
+    }
+    if (p === '/random') {
+      return env.ASSETS.fetch(new URL('/random.html', request.url).toString());
+    }
+    if (p === '/review') {
+      return env.ASSETS.fetch(new URL('/review.html', request.url).toString());
     }
     if (p === '/admin') {
       return env.ASSETS.fetch(new URL('/admin.html', request.url).toString());
@@ -207,6 +216,38 @@ async function handleStats(request, env) {
       total: total.c, correct: correct.c,
       avg_time_ms: Math.round(time.avg || 0),
     }, 200, h);
+  } catch (e) {
+    return json({ error: e.message }, 500, h);
+  }
+}
+
+async function handleReview(request, env) {
+  const h = corsHeaders();
+  try {
+    const url = new URL(request.url);
+    const uuid = url.searchParams.get('uuid');
+    if (!uuid) return json({ error: 'uuid required' }, 400);
+
+    // latest wrong answers, each question once (most recent attempt)
+    const { results } = await env.MATHBARKER_DB.prepare(
+      `SELECT DISTINCT question_id FROM mathbarker_records
+       WHERE user_uuid = ? AND is_correct = 0
+       ORDER BY created_at DESC
+       LIMIT 20`
+    ).bind(uuid).all();
+
+    const ids = results.map(r => r.question_id);
+    if (!ids.length) return json([], 200, h);
+
+    // load those questions
+    const placeholders = ids.map(() => '?').join(',');
+    const { results: questions } = await env.MATHBARKER_DB.prepare(
+      `SELECT id, q, explanation, answer FROM mathbarker_questions WHERE id IN (${placeholders})`
+    ).bind(...ids).all();
+
+    // preserve wrong-answer order
+    const ordered = ids.map(id => questions.find(q => q.id === id)).filter(Boolean);
+    return json(ordered, 200, h);
   } catch (e) {
     return json({ error: e.message }, 500, h);
   }

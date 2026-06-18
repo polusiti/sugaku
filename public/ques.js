@@ -41,3 +41,13 @@ async function fetchStats() {
   } catch (_) {}
   return null;
 }
+
+async function loadReviewQuestions() {
+  const id = getId();
+  if (!id) return [];
+  try {
+    const r = await fetch('/api/review?uuid=' + id.uuid);
+    if (r.ok) return await r.json();
+  } catch (_) {}
+  return [];
+}
