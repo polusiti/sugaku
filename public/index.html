@@ -15,23 +15,22 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --ink: #e8e8e8;
-      --faint: #8a8a8a;
-      --accent: #ffffff;
+      --paper: #111111;
+      --ink: #d0d0d0;
+      --faint: #666;
+      --rule: #1e1e1e;
+      --accent: #e8c8b0;
+      --card-bg: #181818;
+      --card-border: #2a2a2a;
     }
 
     html, body { height: 100%; }
 
     body {
-      background: #000;
+      background: var(--paper);
       font-family: 'Georgia', 'Times New Roman', serif;
       color: var(--ink);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
       min-height: 100vh;
-      overflow: hidden;
       position: relative;
     }
 
@@ -40,89 +39,210 @@
       top: 0; left: 0;
       width: 100vw; height: 100vh;
       z-index: 0;
+      opacity: 0.55;
+    }
+
+    /* ノートの罫線 */
+    .ruled-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 1;
+      pointer-events: none;
+      background-image: repeating-linear-gradient(
+        transparent, transparent 31px, rgba(255,255,255,0.04) 31px, rgba(255,255,255,0.04) 32px
+      );
+      background-size: 100% 32px;
     }
 
     .wrap {
-      width: 100%;
-      max-width: 480px;
-      padding: 32px 24px;
       position: relative;
-      z-index: 1;
-      text-align: center;
+      z-index: 2;
+      width: 100%;
+      max-width: 540px;
+      margin: 0 auto;
+      padding: 40px 24px 60px;
+    }
+
+    /* ヘッダー */
+    .hd {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 0 2px 14px;
+      border-bottom: 1.5px solid rgba(255,255,255,0.25);
+      margin-bottom: 36px;
     }
 
     .logo {
-      font-size: 2.4rem;
+      font-size: 1.6rem;
       font-weight: 700;
       letter-spacing: 0.06em;
-      margin-bottom: 8px;
       font-style: italic;
+      color: #e0e0e0;
     }
-
-    .tagline {
-      font-size: 0.85rem;
+    .logo sub {
+      font-size: 0.6rem;
       color: var(--faint);
-      letter-spacing: 0.08em;
-      margin-bottom: 48px;
+      letter-spacing: 0.02em;
+      font-style: normal;
     }
 
-    .card {
-      background: rgba(20,20,20,0.80);
-      border: 1px solid rgba(255,255,255,0.25);
-      padding: 40px 28px;
-    }
-
-    .card p {
-      font-size: 0.95rem;
-      line-height: 1.8;
+    .hd-right {
+      font-size: 0.75rem;
       color: var(--faint);
-      margin-bottom: 24px;
+      letter-spacing: 0.06em;
     }
 
-    .btn {
-      display: inline-block;
-      padding: 12px 40px;
-      background: rgba(255,255,255,0.12);
-      color: var(--ink);
-      border: 1px solid rgba(255,255,255,0.3);
-      font-family: 'Georgia', serif;
-      font-size: 1rem;
-      letter-spacing: 0.05em;
+    /* メモボード */
+    .memo-board {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .memo {
+      position: relative;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 28px 24px 22px;
       cursor: pointer;
-      text-decoration: none;
-      transition: background 0.15s;
+      font-family: 'Georgia', serif;
+      text-align: center;
+      transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
     }
-    .btn:hover { background: rgba(255,255,255,0.2); }
+    .memo:hover {
+      transform: scale(1.02);
+      border-color: rgba(255,255,255,0.25);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    }
+    .memo:active { transform: scale(0.98); }
+
+    /* ゆるい傾き */
+    .memo:nth-child(1) { transform: rotate(-0.6deg); }
+    .memo:nth-child(2) { transform: rotate(0.4deg); }
+    .memo:nth-child(3) { transform: rotate(0.7deg); }
+    .memo:nth-child(4) { transform: rotate(-0.3deg); }
+    .memo:nth-child(1):hover { transform: rotate(-0.6deg) scale(1.02); }
+    .memo:nth-child(2):hover { transform: rotate(0.4deg) scale(1.02); }
+    .memo:nth-child(3):hover { transform: rotate(0.7deg) scale(1.02); }
+    .memo:nth-child(4):hover { transform: rotate(-0.3deg) scale(1.02); }
+
+    /* 画鋲 */
+    .memo-pin {
+      position: absolute;
+      top: -9px; left: 50%;
+      transform: translateX(-50%);
+      width: 13px; height: 13px;
+      border-radius: 50%;
+      border: 1px solid rgba(0,0,0,0.3);
+      box-shadow: 1px 1px 0 rgba(0,0,0,0.2);
+      z-index: 3;
+    }
+    .memo:nth-child(1) .memo-pin { background: #c44536; }
+    .memo:nth-child(2) .memo-pin { background: #2a4a7a; }
+    .memo:nth-child(3) .memo-pin { background: #4a6a3a; }
+    .memo:nth-child(4) .memo-pin { background: #7a4a2a; }
+
+    .memo-pin::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 50%;
+      transform: translateX(-50%);
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.5);
+    }
+
+    .memo-cat {
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: #d0d0d0;
+      margin-bottom: 6px;
+    }
+    .memo-desc {
+      font-size: 0.8rem;
+      color: var(--faint);
+      line-height: 1.6;
+    }
+
+    .memo-icon {
+      display: block;
+      font-size: 1rem;
+      color: var(--faint);
+      margin-bottom: 8px;
+      letter-spacing: 0.03em;
+    }
+
+    /* フッター */
+    .foot {
+      text-align: center;
+      margin-top: 44px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+    .foot-text {
+      font-size: 0.7rem;
+      color: #444;
+      letter-spacing: 0.06em;
+    }
   </style>
 </head>
 <body>
 <canvas id="chaosCanvas"></canvas>
+<div class="ruled-overlay"></div>
 
 <div class="wrap">
-  <div class="logo">mathbarker</div>
-  <div class="tagline">singularity & structure</div>
+  <header class="hd">
+    <span class="logo">mathbarker<sub>.top</sub></span>
+    <span class="hd-right">singularity &amp; structure</span>
+  </header>
 
-  <div class="card">
-    <p>
-      A math platform built on simplicity.<br>
-      No choices. No tricks.<br>
-      Just numbers and the truth.
-    </p>
-    <div class="btn">Enter</div>
+  <div class="memo-board">
+    <div class="memo" onclick="location.href='/theory'">
+      <span class="memo-pin"></span>
+      <span class="memo-icon">f (x) &nbsp;=&nbsp; x</span>
+      <div class="memo-cat">Theory</div>
+      <div class="memo-desc">Algebra &middot; Calculus &middot; Geometry</div>
+    </div>
+
+    <div class="memo" onclick="location.href='/exam'">
+      <span class="memo-pin"></span>
+      <span class="memo-icon">&Sigma; &nbsp;=&nbsp; answer</span>
+      <div class="memo-cat">Exam</div>
+      <div class="memo-desc">Center exams &amp; entrance problems</div>
+    </div>
+
+    <div class="memo" onclick="location.href='/review'">
+      <span class="memo-pin"></span>
+      <span class="memo-icon">Review</span>
+      <div class="memo-cat">Notebook</div>
+      <div class="memo-desc">Your mistakes, revisited</div>
+    </div>
+
+    <div class="memo">
+      <span class="memo-pin"></span>
+      <span class="memo-icon">How it works</span>
+      <div class="memo-cat">The Method</div>
+      <div class="memo-desc">No choices. No tricks.<br>Numbers only. Sum them up.</div>
+    </div>
   </div>
 
+  <div class="foot">
+    <span class="foot-text">MATHBARKER</span>
+  </div>
 </div>
 
 <script>
-/* de Jong attractor — WebGL particle field
-   Adapted from qc20/dejong-attractor (MIT-compatible) */
+/* de Jong attractor — WebGL particle field */
 (function(){
   const canvas = document.getElementById('chaosCanvas');
   const gl = canvas.getContext('webgl', {alpha: false}) ||
              canvas.getContext('experimental-webgl', {alpha: false});
   if (!gl) return;
 
-  /* ── shaders ── */
   const vertSrc = `
     attribute vec2 a_pos;
     uniform float u_time;
@@ -150,7 +270,6 @@
       gl_FragColor = vec4(1.0, 1.0, 1.0, 0.045);
     }`;
 
-  /* ── compile ── */
   function compile(type, src) {
     const s = gl.createShader(type);
     gl.shaderSource(s, src); gl.compileShader(s);
@@ -165,7 +284,6 @@
   const uTime = gl.getUniformLocation(prog, 'u_time');
   const uRes  = gl.getUniformLocation(prog, 'u_res');
 
-  /* ── 1M particles ── */
   const N = 1 << 20;
   const pos = new Float32Array(N * 2);
   for (let i = 0; i < pos.length; i++) pos[i] = Math.random() * 2 - 1;
@@ -173,7 +291,6 @@
   gl.bindBuffer(gl.ARRAY_BUFFER, buf);
   gl.bufferData(gl.ARRAY_BUFFER, pos, gl.STATIC_DRAW);
 
-  /* ── render loop ── */
   function resize() {
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
