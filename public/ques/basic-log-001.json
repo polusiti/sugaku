@@ -1,0 +1,9 @@
+{
+  "id": "basic-log-001",
+  "subject": "math",
+  "level": "basic",
+  "category": "logarithm",
+  "q": "$\\log_2 32 + \\log_3 9$ の値を求めよ。",
+  "explanation": "$\\log_2 32 = 5$、$\\log_3 9 = 2$ より $5+2=7$。",
+  "answer": 7
+}

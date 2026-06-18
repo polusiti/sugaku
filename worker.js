@@ -13,6 +13,12 @@ export default {
       return handleStats(request, env);
     }
 
+    /* ── page routing ── */
+    if (url.pathname === '/basic') {
+      url.pathname = '/basic.html';
+      return env.ASSETS.fetch(new Request(url, request));
+    }
+
     /* ── assets ── */
     return env.ASSETS.fetch(request);
   }
