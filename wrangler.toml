@@ -1,0 +1,8 @@
+name = "sugaku"
+main = "worker.js"
+compatibility_date = "2025-11-12"
+account_id = "ba21c5b4812c8151fe16474a782a12d8"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
