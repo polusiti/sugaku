@@ -1,9 +1,0 @@
-{
-  "id": "basic-algebra-001",
-  "subject": "math",
-  "level": "basic",
-  "category": "algebra",
-  "q": "2次方程式 $x^2 - 7x + 12 = 0$ の解をすべて求めよ。解の和を計算せよ。",
-  "explanation": "$x^2-7x+12=(x-3)(x-4)=0$ より $x=3,4$。和は $3+4=7$。",
-  "answer": 7
-}

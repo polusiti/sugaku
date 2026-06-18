@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>mathbarker — Basic</title>
+  <title>mathbarker</title>
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" href="/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -181,7 +181,7 @@
   <header class="hd">
     <a class="back" href="/">← mathbarker</a>
     <div style="display:flex;align-items:center;gap:12px">
-      <span class="level-badge">BASIC</span>
+      <span class="level-badge" id="levelBadge"></span>
       <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme"></button>
     </div>
   </header>
@@ -217,7 +217,7 @@
   </div>
 </div>
 
-<script src="/basic.js"></script>
+<script src="/ques.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 <script>
@@ -233,8 +233,14 @@
     localStorage.setItem('mathbarker-theme', html.classList.contains('dark') ? 'dark' : 'light');
   });
 
+  /* level from URL */
+  const m = location.pathname.match(/\/level\/(.+)/);
+  const level = m ? m[1] : '1a';
+  document.getElementById('levelBadge').textContent = level.toUpperCase();
+  document.title = 'mathbarker — ' + level.toUpperCase();
+
   /* questions */
-  const questions = await loadQuestions('basic');
+  const questions = await loadQuestions(level);
   if (!questions.length) {
     document.getElementById('loading').textContent = 'No questions yet.';
     return;

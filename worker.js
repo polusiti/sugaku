@@ -33,13 +33,12 @@ export default {
     }
 
     /* ── page routing ── */
-    if (url.pathname === '/basic') {
-      url.pathname = '/basic.html';
-      return env.ASSETS.fetch(new Request(url, request));
+    const p = url.pathname.toLowerCase();
+    if (p.startsWith('/level/')) {
+      return env.ASSETS.fetch(new URL('/level.html', request.url).toString());
     }
-    if (url.pathname === '/admin') {
-      url.pathname = '/admin.html';
-      return env.ASSETS.fetch(new Request(url, request));
+    if (p === '/admin') {
+      return env.ASSETS.fetch(new URL('/admin.html', request.url).toString());
     }
 
     /* ── assets ── */
