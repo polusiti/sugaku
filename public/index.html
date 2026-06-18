@@ -31,7 +31,6 @@
       --corner: rgba(0,0,0,0.08);
       --tape-bg: rgba(0,0,0,0.02);
       --tape-border: rgba(0,0,0,0.05);
-      --foot-color: #ccc;
       --shadow-hover: rgba(0,0,0,0.03);
       --noise-opacity: 0.04;
       --noise-invert: 0%;
@@ -58,7 +57,6 @@
       --corner: rgba(255,255,255,0.06);
       --tape-bg: rgba(255,255,255,0.03);
       --tape-border: rgba(255,255,255,0.04);
-      --foot-color: #222;
       --shadow-hover: rgba(255,255,255,0.01);
       --noise-opacity: 0.05;
       --noise-invert: 100%;
@@ -161,11 +159,6 @@
       letter-spacing: 0.04em;
       transform: rotate(-0.6deg);
       color: var(--ink);
-      transition: color 0.4s ease;
-    }
-    .logo-sub {
-      font-size: 0.65rem; font-weight: 400;
-      color: var(--faint); margin-left: 4px;
       transition: color 0.4s ease;
     }
     .hd-right {
@@ -282,19 +275,6 @@
       transition: opacity 0.2s;
     }
     .memo:hover .tape { opacity: 1; }
-
-    /* ── footer ── */
-    .foot {
-      text-align: center; margin-top: 48px;
-      padding-top: 20px;
-      border-top: 1px dashed var(--dash);
-    }
-    .foot-text {
-      font-size: 0.7rem; color: var(--foot-color);
-      letter-spacing: 0.1em; transform: rotate(-0.3deg);
-      display: inline-block;
-      transition: color 0.4s ease;
-    }
   </style>
 </head>
 <body>
@@ -392,9 +372,9 @@
 
 <div class="wrap">
   <header class="hd">
-    <span class="logo">mathbarker<span class="logo-sub">.top</span></span>
+    <span class="logo">mathbarker</span>
     <div class="hd-right">
-      <span>singularity &amp; structure</span>
+      <span>Dark &amp; Light</span>
       <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme"></button>
     </div>
   </header>
@@ -431,9 +411,6 @@
     <div class="memo-desc">Sum all the numbers. Just numbers and the truth.</div>
   </div>
 
-  <div class="foot">
-    <span class="foot-text">MATHBARKER</span>
-  </div>
 </div>
 
 <script>
