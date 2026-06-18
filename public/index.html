@@ -164,51 +164,44 @@
     /* ── contents ── */
     .toc { list-style: none; }
 
-    .toc-group {
-      border-top: 1px solid var(--border);
-      padding: 20px 6px 10px;
-    }
-    .toc-group-name {
-      font-size: 0.7rem; font-weight: 600;
-      color: var(--faint);
-      letter-spacing: 0.12em;
-      margin-bottom: 12px;
+    .toc-section { margin-bottom: 28px; }
+
+    .toc-head {
+      font-size: 0.72rem; font-weight: 600;
+      color: var(--faint); letter-spacing: 0.12em;
+      padding: 0 4px 8px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 6px;
       transition: color 0.4s ease;
     }
 
     .toc-row {
       display: flex; align-items: baseline;
-      padding: 12px 4px 12px 20px;
+      padding: 13px 4px;
       cursor: pointer;
-      transition: background 0.15s ease, padding-left 0.2s ease;
       font-family: 'Caveat', cursive;
       color: var(--ink);
       text-decoration: none;
+      transition: background 0.15s ease, padding-left 0.2s ease;
+      border-bottom: 1px solid var(--line);
     }
     .toc-row:hover {
       background: var(--row-hover);
-      padding-left: 28px;
+      padding-left: 10px;
     }
-    .toc-row:last-child { border-bottom: none; }
 
-    .toc-sub {
-      width: 32px; flex-shrink: 0;
-      font-size: 0.8rem; font-weight: 600;
+    .toc-label {
+      flex: 1; min-width: 0;
+      font-size: 1.15rem; font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .toc-meta {
+      flex-shrink: 0; text-align: right;
+      font-size: 0.72rem; font-weight: 600;
+      letter-spacing: 0.04em; margin-left: 12px;
       color: var(--faint);
       transition: color 0.4s ease;
     }
-    .toc-rate {
-      width: 42px; flex-shrink: 0; text-align: right;
-      font-size: 0.7rem; font-weight: 600;
-      color: var(--faint); letter-spacing: 0.02em;
-      transition: color 0.4s ease;
-    }
-
-    .toc-end {
-      border-top: 1px solid var(--border);
-    }
-    .toc-end .toc-row { padding: 18px 6px; }
-    .toc-end .toc-row:last-child { border-bottom: none; }
 
   </style>
 </head>
@@ -276,46 +269,49 @@
 
   <div class="toc">
     <!-- Basic -->
-    <div class="toc-group">
-      <div class="toc-group-name">Basic</div>
+    <div class="toc-section">
+      <div class="toc-head">Basic</div>
       <a class="toc-row" href="/level/basic?subject=1a">
-        <span class="toc-sub">1A</span>
-        <span class="toc-rate" data-key="basic-1a">—</span>
+        <span class="toc-label">1A</span>
+        <span class="toc-meta" data-key="basic-1a">—</span>
       </a>
       <a class="toc-row" href="/level/basic?subject=2b">
-        <span class="toc-sub">2B</span>
-        <span class="toc-rate" data-key="basic-2b">—</span>
+        <span class="toc-label">2B</span>
+        <span class="toc-meta" data-key="basic-2b">—</span>
       </a>
       <a class="toc-row" href="/level/basic?subject=3">
-        <span class="toc-sub">3</span>
-        <span class="toc-rate" data-key="basic-3">—</span>
+        <span class="toc-label">3</span>
+        <span class="toc-meta" data-key="basic-3">—</span>
       </a>
     </div>
 
     <!-- Standard -->
-    <div class="toc-group">
-      <div class="toc-group-name">Standard</div>
+    <div class="toc-section">
+      <div class="toc-head">Standard</div>
       <a class="toc-row" href="/level/standard?subject=1a">
-        <span class="toc-sub">1A</span>
-        <span class="toc-rate" data-key="standard-1a">—</span>
+        <span class="toc-label">1A</span>
+        <span class="toc-meta" data-key="standard-1a">—</span>
       </a>
       <a class="toc-row" href="/level/standard?subject=2b">
-        <span class="toc-sub">2B</span>
-        <span class="toc-rate" data-key="standard-2b">—</span>
+        <span class="toc-label">2B</span>
+        <span class="toc-meta" data-key="standard-2b">—</span>
       </a>
       <a class="toc-row" href="/level/standard?subject=3">
-        <span class="toc-sub">3</span>
-        <span class="toc-rate" data-key="standard-3">—</span>
+        <span class="toc-label">3</span>
+        <span class="toc-meta" data-key="standard-3">—</span>
       </a>
     </div>
 
-    <!-- footer rows -->
-    <div class="toc-end">
+    <!-- other -->
+    <div class="toc-section">
+      <div class="toc-head">Other</div>
       <a class="toc-row" href="/random">
-        <span class="toc-sub"></span>Random<span class="toc-rate"></span>
+        <span class="toc-label">Random</span>
+        <span class="toc-meta">explore</span>
       </a>
-      <a class="toc-row" href="/review" id="reviewRow">
-        <span class="toc-sub"></span>Review<span class="toc-rate" id="reviewBadge"></span>
+      <a class="toc-row" href="/review">
+        <span class="toc-label">Review</span>
+        <span class="toc-meta" id="reviewBadge">—</span>
       </a>
     </div>
   </div>
