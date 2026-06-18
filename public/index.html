@@ -199,6 +199,40 @@
       letter-spacing: 0.03em;
     }
 
+    /* ── handle ── */
+    .identity {
+      margin-top: 44px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .identity-label {
+      font-size: 0.7rem; font-weight: 600;
+      color: var(--faint); letter-spacing: 0.08em;
+      white-space: nowrap;
+      transition: color 0.4s ease;
+    }
+    .identity-input {
+      flex: 1;
+      background: none;
+      border: none;
+      border-bottom: 1px dashed var(--dash);
+      padding: 6px 2px;
+      font-family: 'Caveat', cursive;
+      font-size: 1rem;
+      color: var(--ink);
+      caret-color: var(--ink);
+      outline: none;
+      transition: border-color 0.2s, color 0.4s ease;
+      -webkit-appearance: none;
+      max-width: 160px;
+    }
+    .identity-input:focus { border-bottom-color: var(--faint); }
+    .identity-input::placeholder { color: var(--faint); opacity: 0.4; }
+    .identity-ok {
+      font-size: 0.65rem; color: var(--faint);
+      letter-spacing: 0.04em;
+      transition: color 0.4s ease;
+    }
+
   </style>
 </head>
 <body>
@@ -282,7 +316,73 @@
     </a>
   </div>
 
+  <div class="identity">
+    <span class="identity-label">name</span>
+    <input class="identity-input" id="handleInput" placeholder="..." autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+    <span class="identity-ok" id="identityOk"></span>
+  </div>
+
 </div>
+
+<script>
+/* ── identity ── */
+(function(){
+  const KEY = 'mathbarker_id';  // { uuid, handle }
+  const input = document.getElementById('handleInput');
+  const ok    = document.getElementById('identityOk');
+
+  function load() {
+    try {
+      return JSON.parse(localStorage.getItem(KEY));
+    } catch(_) { return null; }
+  }
+
+  function save(id) {
+    localStorage.setItem(KEY, JSON.stringify(id));
+    if (id.handle) {
+      fetch('/api/identity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uuid: id.uuid, handle: id.handle }),
+      }).catch(() => {});
+    }
+  }
+
+  function show(id) {
+    input.value = id.handle;
+    ok.textContent = 'saved';
+  }
+
+  function clear() {
+    ok.textContent = '';
+  }
+
+  let id = load();
+  if (id) {
+    show(id);
+    if (id.handle) save(id); // sync on load
+  } else {
+    id = { uuid: crypto.randomUUID(), handle: '' };
+    save(id);
+  }
+
+  input.addEventListener('focus', () => { clear(); });
+  input.addEventListener('blur', () => {
+    const v = input.value.trim();
+    if (v && v !== id.handle) {
+      id.handle = v;
+      save(id);
+      ok.textContent = 'saved';
+    } else if (!v) {
+      input.value = id.handle || '';
+      ok.textContent = id.handle ? 'saved' : '';
+    }
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { input.blur(); }
+  });
+})();
+</script>
 
 <script>
 /* de Jong */

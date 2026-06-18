@@ -6,3 +6,8 @@ account_id = "ba21c5b4812c8151fe16474a782a12d8"
 [assets]
 directory = "./public"
 binding = "ASSETS"
+
+[[d1_databases]]
+binding = "MATHBARKER_DB"
+database_name = "testapp-database"
+database_id = "ae1bafef-5bf9-4a9d-9773-14c2b017d2be"
