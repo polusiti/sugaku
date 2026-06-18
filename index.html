@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a0a0a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>mathbarker</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icon-192.png">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --paper: #f8f8f8;
+      --ink: #0a0a0a;
+      --faint: #8a8a8a;
+      --rule: #d4d4d4;
+      --accent: #1a1a1a;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      background: var(--paper);
+      font-family: 'Georgia', 'Times New Roman', serif;
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #chaosCanvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+      opacity: 0.25;
+    }
+
+    .wrap {
+      width: 100%;
+      max-width: 480px;
+      padding: 32px 24px;
+      position: relative;
+      z-index: 1;
+      text-align: center;
+    }
+
+    .logo {
+      font-size: 2.4rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+      font-style: italic;
+    }
+
+    .tagline {
+      font-size: 0.85rem;
+      color: var(--faint);
+      letter-spacing: 0.08em;
+      margin-bottom: 48px;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.85);
+      border: 1.5px solid var(--ink);
+      padding: 40px 28px;
+      box-shadow: 2px 2px 0 var(--ink);
+    }
+
+    .card p {
+      font-size: 0.95rem;
+      line-height: 1.8;
+      color: var(--accent);
+      margin-bottom: 24px;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 12px 40px;
+      background: var(--ink);
+      color: #fff;
+      border: none;
+      font-family: 'Georgia', serif;
+      font-size: 1rem;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.8; }
+
+    .status {
+      margin-top: 20px;
+      font-size: 0.75rem;
+      color: var(--faint);
+      letter-spacing: 0.04em;
+    }
+  </style>
+</head>
+<body>
+<canvas id="chaosCanvas"></canvas>
+
+<div class="wrap">
+  <div class="logo">mathbarker</div>
+  <div class="tagline">singularity & structure</div>
+
+  <div class="card">
+    <p>
+      A math platform built on simplicity.<br>
+      No choices. No tricks.<br>
+      Just numbers and the truth.
+    </p>
+    <div class="btn">Enter</div>
+  </div>
+
+  <div class="status">sugaku.allfrom0.top</div>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('chaosCanvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, animId;
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  /* Lorenz attractor particles */
+  const N = 200;
+  let particles = [];
+  const sigma = 10, rho = 28, beta = 8/3;
+  const dt = 0.003;
+
+  function reset() {
+    particles = [];
+    for (let i = 0; i < N; i++) {
+      particles.push({
+        x: 0.1 + Math.random() * 10,
+        y: 0.1 + Math.random() * 10,
+        z: 20 + Math.random() * 10,
+        trail: []
+      });
+    }
+  }
+  reset();
+
+  function lorenzStep(p) {
+    const dx = sigma * (p.y - p.x) * dt;
+    const dy = (p.x * (rho - p.z) - p.y) * dt;
+    const dz = (p.x * p.y - beta * p.z) * dt;
+    p.x += dx;
+    p.y += dy;
+    p.z += dz;
+    const sx = (p.x - 20) * 6  + W/2;
+    const sy = (p.y - 25) * 5  + H/2;
+    p.trail.push({ x: sx, y: sy });
+    if (p.trail.length > 80) p.trail.shift();
+    return { sx, sy };
+  }
+
+  function tick() {
+    ctx.clearRect(0, 0, W, H);
+    particles.forEach(p => {
+      const { sx, sy } = lorenzStep(p);
+      if (p.trail.length < 2) return;
+      ctx.beginPath();
+      ctx.moveTo(p.trail[0].x, p.trail[0].y);
+      for (let i = 1; i < p.trail.length; i++) {
+        ctx.lineTo(p.trail[i].x, p.trail[i].y);
+      }
+      const alpha = 0.03;
+      ctx.strokeStyle = `rgba(10,10,10,${alpha})`;
+      ctx.lineWidth = 0.6;
+      ctx.stroke();
+    });
+    animId = requestAnimationFrame(tick);
+  }
+
+  tick();
+
+  canvas.addEventListener('click', () => reset());
+})();
+</script>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+  }
+</script>
+</body>
+</html>
