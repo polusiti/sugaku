@@ -63,46 +63,35 @@ async function handleListQuestions(request, env) {
   const h = corsHeaders();
   const url = new URL(request.url);
   const level = url.searchParams.get('level') || '';
+  const subject = url.searchParams.get('subject') || '';
   const admin = url.searchParams.get('admin');
 
-  let rows;
-  if (admin === '1') {
-    if (level) {
-      rows = (await env.MATHBARKER_DB.prepare(
-        'SELECT * FROM mathbarker_questions WHERE level = ? ORDER BY category, id'
-      ).bind(level).all()).results;
-    } else {
-      rows = (await env.MATHBARKER_DB.prepare(
-        'SELECT * FROM mathbarker_questions ORDER BY level, category, id'
-      ).all()).results;
-    }
-  } else {
-    if (level) {
-      rows = (await env.MATHBARKER_DB.prepare(
-        'SELECT id, q, explanation, answer FROM mathbarker_questions WHERE level = ? ORDER BY category, id'
-      ).bind(level).all()).results;
-    } else {
-      rows = (await env.MATHBARKER_DB.prepare(
-        'SELECT id, q, explanation, answer FROM mathbarker_questions ORDER BY category, id'
-      ).all()).results;
-    }
-  }
+  const conditions = [];
+  const binds = [];
 
-  return json(rows, 200, h);
+  if (level) { conditions.push('level = ?'); binds.push(level); }
+  if (subject) { conditions.push('subject_group = ?'); binds.push(subject); }
+
+  const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+  const cols = admin === '1' ? '*' : 'id, q, explanation, answer';
+
+  const stmt = `SELECT ${cols} FROM mathbarker_questions ${where} ORDER BY subject_group, category, id`;
+  const result = await env.MATHBARKER_DB.prepare(stmt).bind(...binds).all();
+  return json(result.results, 200, h);
 }
 
 async function handleCreateQuestion(request, env) {
   const h = corsHeaders();
   try {
     const body = await request.json();
-    const { id, level, category, q, explanation, answer } = body;
+    const { id, level, subject_group, category, q, explanation, answer } = body;
     if (!id || !level || !q || answer === undefined) {
       return json({ error: 'id, level, q, answer required' }, 400);
     }
 
     await env.MATHBARKER_DB.prepare(
-      'INSERT OR REPLACE INTO mathbarker_questions (id, level, category, q, explanation, answer, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))'
-    ).bind(id, level, category || '', q, explanation || '', answer).run();
+      'INSERT OR REPLACE INTO mathbarker_questions (id, level, subject_group, category, q, explanation, answer, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime("now"))'
+    ).bind(id, level, subject_group || '1a', category || '', q, explanation || '', answer).run();
 
     return json({ ok: true, id }, 200, h);
   } catch (e) {
@@ -121,7 +110,7 @@ async function handleUpdateQuestion(request, env, path) {
     if (!existing) return json({ error: 'not found' }, 404);
 
     const sets = [], vals = [];
-    for (const k of ['level','category','q','explanation','answer']) {
+    for (const k of ['level','subject_group','category','q','explanation','answer']) {
       if (body[k] !== undefined) { sets.push(k+'=?'); vals.push(body[k]); }
     }
     if (!sets.length) return json({ error: 'no fields' }, 400);

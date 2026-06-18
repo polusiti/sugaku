@@ -66,8 +66,9 @@
     .q-table th { font-size: 0.7rem; letter-spacing: 0.06em; color: var(--faint); font-weight: 600; }
     .q-row:hover { background: var(--row-hover); }
     .q-td-id { max-width: 140px; word-break: break-all; font-size: 0.78rem; }
-    .q-td-lv { width: 70px; }
-    .q-td-cat { width: 90px; font-size: 0.78rem; }
+    .q-td-lv { width: 60px; }
+    .q-td-sub { width: 40px; font-size: 0.78rem; }
+    .q-td-cat { width: 80px; font-size: 0.78rem; }
     .q-td-q { min-width: 200px; }
     .q-td-ans { width: 50px; text-align: center; }
     .q-td-act { width: 80px; }
@@ -152,6 +153,7 @@
         <tr>
           <th>ID</th>
           <th>Level</th>
+          <th>Subj</th>
           <th>Category</th>
           <th>Question</th>
           <th>Ans</th>
@@ -173,8 +175,12 @@
     <select id="qLevel">
       <option value="basic">basic</option>
       <option value="standard">standard</option>
-      <option value="random">random</option>
-      <option value="review">review</option>
+    </select>
+    <label>Subject group</label>
+    <select id="qSubject">
+      <option value="1a">1A</option>
+      <option value="2b">2B</option>
+      <option value="3">3</option>
     </select>
     <label>Category</label>
     <input id="qCat" placeholder="algebra">

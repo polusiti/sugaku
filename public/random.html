@@ -96,9 +96,13 @@
 <script>
 (async function(){
   let all = [];
-  for (const level of ['1a','2b','3']) {
-    const qs = await loadQuestions(level);
-    all = all.concat(qs);
+  for (const lv of ['basic','standard']) {
+    for (const sub of ['1a','2b','3']) {
+      try {
+        const r = await fetch('/api/questions?level=' + lv + '&subject=' + sub);
+        if (r.ok) { const qs = await r.json(); all = all.concat(qs); }
+      } catch(_) {}
+    }
   }
   if (!all.length) { document.getElementById('loading').textContent = 'No questions yet.'; return; }
   // shuffle

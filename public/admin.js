@@ -38,8 +38,9 @@ async function loadAll() {
     <tr class="q-row" data-id="${q.id}">
       <td class="q-td-id">${q.id}</td>
       <td class="q-td-lv">${q.level}</td>
+      <td class="q-td-sub">${q.subject_group || ''}</td>
       <td class="q-td-cat">${q.category||''}</td>
-      <td class="q-td-q">${esc(q.q.substring(0,60))}${q.q.length>60?'…':''}</td>
+      <td class="q-td-q">${esc(q.q.substring(0,50))}${q.q.length>50?'…':''}</td>
       <td class="q-td-ans">${q.answer}</td>
       <td class="q-td-act">
         <button class="act-btn edit" onclick="startEdit('${q.id}')">edit</button>
@@ -52,6 +53,7 @@ async function loadAll() {
 async function saveQ() {
   const id = document.getElementById('qId').value.trim();
   const level = document.getElementById('qLevel').value;
+  const subject_group = document.getElementById('qSubject').value;
   const category = document.getElementById('qCat').value.trim();
   const q = document.getElementById('qText').value.trim();
   const explanation = document.getElementById('qExp').value.trim();
@@ -62,7 +64,7 @@ async function saveQ() {
     return;
   }
 
-  const body = { id, level, category, q, explanation, answer };
+  const body = { id, level, subject_group, category, q, explanation, answer };
   const editId = document.getElementById('editor').dataset.editId;
 
   if (editId) {
@@ -82,14 +84,13 @@ async function deleteQ(id) {
 }
 
 function startEdit(id) {
-  // find row data
   const row = document.querySelector(`tr[data-id="${id}"]`);
   if (!row) return;
   const cells = row.querySelectorAll('td');
   document.getElementById('qId').value = cells[0].textContent;
   document.getElementById('qLevel').value = cells[1].textContent;
-  document.getElementById('qCat').value = cells[2].textContent;
-  // need full q + exp from API
+  document.getElementById('qSubject').value = cells[2].textContent;
+  document.getElementById('qCat').value = cells[3].textContent;
   api('GET', API + '?admin=1').then(qs => {
     const q = qs.find(x => x.id === id);
     if (q) {
@@ -106,6 +107,7 @@ function startEdit(id) {
 function newQ() {
   document.getElementById('qId').value = '';
   document.getElementById('qLevel').value = 'basic';
+  document.getElementById('qSubject').value = '1a';
   document.getElementById('qCat').value = '';
   document.getElementById('qText').value = '';
   document.getElementById('qExp').value = '';

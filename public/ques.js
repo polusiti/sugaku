@@ -1,7 +1,9 @@
 /* mathbarker — question engine */
-async function loadQuestions(level) {
+async function loadQuestions(level, subject) {
   try {
-    const r = await fetch('/api/questions?level=' + level);
+    let url = '/api/questions?level=' + level;
+    if (subject) url += '&subject=' + subject;
+    const r = await fetch(url);
     if (r.ok) return await r.json();
   } catch (_) {}
   return [];
