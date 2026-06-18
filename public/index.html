@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#0a0a0a">
+  <meta name="theme-color" content="#0d0d0d">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>mathbarker</title>
@@ -11,223 +11,225 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-180.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --paper: #111111;
-      --ink: #d0d0d0;
-      --faint: #666;
-      --rule: #1e1e1e;
-      --accent: #e8c8b0;
-      --card-bg: #181818;
-      --card-border: #2a2a2a;
+      --paper: #0d0d0d;
+      --ink: #d8d8d8;
+      --faint: #5a5a5a;
+      --line: rgba(255,255,255,0.025);
+      --card-bg: #111111;
     }
 
     html, body { height: 100%; }
 
     body {
       background: var(--paper);
-      font-family: 'Georgia', 'Times New Roman', serif;
+      font-family: 'Caveat', cursive;
       color: var(--ink);
       min-height: 100vh;
       position: relative;
+      -webkit-font-smoothing: antialiased;
     }
 
+    /* ── noise texture ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      opacity: 0.06;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size: 256px 256px;
+      pointer-events: none;
+    }
+
+    /* ── de Jong canvas ── */
     #chaosCanvas {
       position: fixed;
       top: 0; left: 0;
       width: 100vw; height: 100vh;
-      z-index: 0;
-      opacity: 0.55;
+      z-index: 1;
+      opacity: 0.50;
+      mix-blend-mode: screen;
     }
 
-    /* ノートの罫線 */
-    .ruled-overlay {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      z-index: 1;
+    /* ── notebook grid ── */
+    .notebook-grid {
+      position: fixed; inset: 0; z-index: 2;
       pointer-events: none;
-      background-image: repeating-linear-gradient(
-        transparent, transparent 31px, rgba(255,255,255,0.04) 31px, rgba(255,255,255,0.04) 32px
-      );
+      background-image:
+        repeating-linear-gradient(transparent, transparent 31px, var(--line) 31px, var(--line) 32px);
       background-size: 100% 32px;
     }
 
+    /* ── page ── */
     .wrap {
-      position: relative;
-      z-index: 2;
-      width: 100%;
-      max-width: 540px;
+      position: relative; z-index: 3;
+      width: 100%; max-width: 560px;
       margin: 0 auto;
       padding: 40px 24px 60px;
     }
 
-    /* ヘッダー */
+    /* ── header ── */
     .hd {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      padding: 0 2px 14px;
-      border-bottom: 1.5px solid rgba(255,255,255,0.25);
-      margin-bottom: 36px;
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 0 4px 16px;
+      border-bottom: 1.5px dashed rgba(255,255,255,0.15);
+      margin-bottom: 40px;
     }
-
     .logo {
-      font-size: 1.6rem;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      font-style: italic;
-      color: #e0e0e0;
+      font-size: 2rem; font-weight: 700;
+      letter-spacing: 0.04em;
+      transform: rotate(-0.6deg);
     }
-    .logo sub {
-      font-size: 0.6rem;
-      color: var(--faint);
-      letter-spacing: 0.02em;
-      font-style: normal;
+    .logo-sub {
+      font-size: 0.65rem; font-weight: 400;
+      color: var(--faint); margin-left: 4px;
     }
-
     .hd-right {
-      font-size: 0.75rem;
-      color: var(--faint);
-      letter-spacing: 0.06em;
+      font-size: 0.85rem; color: var(--faint);
+      transform: rotate(0.4deg);
     }
 
-    /* メモボード */
-    .memo-board {
-      display: flex;
-      flex-direction: column;
-      gap: 28px;
-    }
-
+    /* ── memo card ── */
     .memo {
       position: relative;
       background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      padding: 28px 24px 22px;
+      padding: 32px 28px 24px;
       cursor: pointer;
-      font-family: 'Georgia', serif;
-      text-align: center;
-      transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+      font-family: 'Caveat', cursive;
+      border: 1.5px solid rgba(255,255,255,0.06);
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     }
     .memo:hover {
-      transform: scale(1.02);
-      border-color: rgba(255,255,255,0.25);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+      border-color: rgba(255,255,255,0.18);
+      box-shadow: 0 0 40px rgba(255,255,255,0.02);
     }
-    .memo:active { transform: scale(0.98); }
 
-    /* ゆるい傾き */
-    .memo:nth-child(1) { transform: rotate(-0.6deg); }
-    .memo:nth-child(2) { transform: rotate(0.4deg); }
-    .memo:nth-child(3) { transform: rotate(0.7deg); }
-    .memo:nth-child(4) { transform: rotate(-0.3deg); }
-    .memo:nth-child(1):hover { transform: rotate(-0.6deg) scale(1.02); }
-    .memo:nth-child(2):hover { transform: rotate(0.4deg) scale(1.02); }
-    .memo:nth-child(3):hover { transform: rotate(0.7deg) scale(1.02); }
-    .memo:nth-child(4):hover { transform: rotate(-0.3deg) scale(1.02); }
+    .memo + .memo { margin-top: 24px; }
 
-    /* 画鋲 */
-    .memo-pin {
-      position: absolute;
-      top: -9px; left: 50%;
-      transform: translateX(-50%);
-      width: 13px; height: 13px;
-      border-radius: 50%;
-      border: 1px solid rgba(0,0,0,0.3);
-      box-shadow: 1px 1px 0 rgba(0,0,0,0.2);
-      z-index: 3;
-    }
-    .memo:nth-child(1) .memo-pin { background: #c44536; }
-    .memo:nth-child(2) .memo-pin { background: #2a4a7a; }
-    .memo:nth-child(3) .memo-pin { background: #4a6a3a; }
-    .memo:nth-child(4) .memo-pin { background: #7a4a2a; }
+    /* subtle per-card rotation */
+    .memo:nth-child(1) { transform: rotate(-0.4deg); }
+    .memo:nth-child(2) { transform: rotate(0.3deg); }
+    .memo:nth-child(3) { transform: rotate(0.5deg); }
+    .memo:nth-child(4) { transform: rotate(-0.2deg); }
+    .memo:nth-child(1):hover { transform: rotate(-0.4deg) translateY(-2px); }
+    .memo:nth-child(2):hover { transform: rotate(0.3deg) translateY(-2px); }
+    .memo:nth-child(3):hover { transform: rotate(0.5deg) translateY(-2px); }
+    .memo:nth-child(4):hover { transform: rotate(-0.2deg) translateY(-2px); }
 
-    .memo-pin::after {
+    /* ── hand-drawn corner marks ── */
+    .memo::before {
       content: '';
-      position: absolute;
-      top: 2px; left: 50%;
-      transform: translateX(-50%);
-      width: 4px; height: 4px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.5);
+      position: absolute; top: -1px; left: -1px;
+      width: 24px; height: 24px;
+      border-top: 1.5px solid rgba(255,255,255,0.12);
+      border-left: 1.5px solid rgba(255,255,255,0.12);
+      border-radius: 0 0 4px 0;
+      opacity: 0;
+      transition: opacity 0.2s;
     }
+    .memo::after {
+      content: '';
+      position: absolute; bottom: -1px; right: -1px;
+      width: 24px; height: 24px;
+      border-bottom: 1.5px solid rgba(255,255,255,0.12);
+      border-right: 1.5px solid rgba(255,255,255,0.12);
+      border-radius: 4px 0 0 0;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .memo:hover::before, .memo:hover::after { opacity: 1; }
 
+    .memo-num {
+      font-size: 0.7rem; font-weight: 600; color: var(--faint);
+      letter-spacing: 0.06em; margin-bottom: 6px;
+    }
     .memo-cat {
-      font-size: 1.1rem;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      color: #d0d0d0;
-      margin-bottom: 6px;
+      font-size: 1.35rem; font-weight: 700;
+      letter-spacing: 0.03em; margin-bottom: 4px;
     }
     .memo-desc {
-      font-size: 0.8rem;
-      color: var(--faint);
-      line-height: 1.6;
+      font-size: 0.85rem; color: var(--faint);
+      line-height: 1.7;
     }
-
-    .memo-icon {
-      display: block;
-      font-size: 1rem;
+    .memo-symbol {
+      font-family: 'Georgia', 'Times New Roman', serif;
+      font-size: 0.75rem;
       color: var(--faint);
       margin-bottom: 8px;
-      letter-spacing: 0.03em;
+      font-style: italic;
+      letter-spacing: 0.02em;
     }
 
-    /* フッター */
+    /* ── footer ── */
     .foot {
-      text-align: center;
-      margin-top: 44px;
+      text-align: center; margin-top: 48px;
       padding-top: 20px;
-      border-top: 1px solid rgba(255,255,255,0.08);
+      border-top: 1px dashed rgba(255,255,255,0.06);
     }
     .foot-text {
-      font-size: 0.7rem;
-      color: #444;
-      letter-spacing: 0.06em;
+      font-size: 0.7rem; color: #333;
+      letter-spacing: 0.1em; transform: rotate(-0.3deg);
+      display: inline-block;
     }
+
+    /* ── paper clip / tape hint ── */
+    .tape {
+      position: absolute; top: -12px; left: 50%;
+      transform: translateX(-50%) rotate(-2deg);
+      width: 36px; height: 14px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .memo:hover .tape { opacity: 1; }
+
   </style>
 </head>
 <body>
 <canvas id="chaosCanvas"></canvas>
-<div class="ruled-overlay"></div>
+<div class="notebook-grid"></div>
 
 <div class="wrap">
   <header class="hd">
-    <span class="logo">mathbarker<sub>.top</sub></span>
+    <span class="logo">mathbarker<span class="logo-sub">.top</span></span>
     <span class="hd-right">singularity &amp; structure</span>
   </header>
 
-  <div class="memo-board">
-    <div class="memo" onclick="location.href='/theory'">
-      <span class="memo-pin"></span>
-      <span class="memo-icon">f (x) &nbsp;=&nbsp; x</span>
-      <div class="memo-cat">Theory</div>
-      <div class="memo-desc">Algebra &middot; Calculus &middot; Geometry</div>
-    </div>
+  <div class="memo" onclick="location.href='/theory'">
+    <span class="tape"></span>
+    <div class="memo-num">I</div>
+    <div class="memo-symbol">f (x) &nbsp;=&nbsp; x</div>
+    <div class="memo-cat">Theory</div>
+    <div class="memo-desc">Algebra &middot; Calculus &middot; Geometry</div>
+  </div>
 
-    <div class="memo" onclick="location.href='/exam'">
-      <span class="memo-pin"></span>
-      <span class="memo-icon">&Sigma; &nbsp;=&nbsp; answer</span>
-      <div class="memo-cat">Exam</div>
-      <div class="memo-desc">Center exams &amp; entrance problems</div>
-    </div>
+  <div class="memo" onclick="location.href='/exam'">
+    <span class="tape"></span>
+    <div class="memo-num">II</div>
+    <div class="memo-symbol">&Sigma; answer &nbsp;=&nbsp; sum</div>
+    <div class="memo-cat">Exam</div>
+    <div class="memo-desc">Center exams &amp; entrance problems</div>
+  </div>
 
-    <div class="memo" onclick="location.href='/review'">
-      <span class="memo-pin"></span>
-      <span class="memo-icon">Review</span>
-      <div class="memo-cat">Notebook</div>
-      <div class="memo-desc">Your mistakes, revisited</div>
-    </div>
+  <div class="memo" onclick="location.href='/review'">
+    <span class="tape"></span>
+    <div class="memo-num">III</div>
+    <div class="memo-symbol">Review &amp; repeat</div>
+    <div class="memo-cat">Notebook</div>
+    <div class="memo-desc">Your mistakes, revisited</div>
+  </div>
 
-    <div class="memo">
-      <span class="memo-pin"></span>
-      <span class="memo-icon">How it works</span>
-      <div class="memo-cat">The Method</div>
-      <div class="memo-desc">No choices. No tricks.<br>Numbers only. Sum them up.</div>
-    </div>
+  <div class="memo">
+    <span class="tape"></span>
+    <div class="memo-num">IV</div>
+    <div class="memo-symbol">No choices. No tricks.</div>
+    <div class="memo-cat">The Method</div>
+    <div class="memo-desc">Sum all the numbers. Just numbers and the truth.</div>
   </div>
 
   <div class="foot">
@@ -236,7 +238,7 @@
 </div>
 
 <script>
-/* de Jong attractor — WebGL particle field */
+/* de Jong attractor — monochrome silver on dark */
 (function(){
   const canvas = document.getElementById('chaosCanvas');
   const gl = canvas.getContext('webgl', {alpha: false}) ||
@@ -252,7 +254,6 @@
       float b = -2.0 + cos(u_time / 12000.0) * 0.3;
       float c = -1.2 + sin(u_time / 10000.0) * 0.2;
       float d =  2.0 + cos(u_time / 9000.0)  * 0.3;
-
       vec2 p = a_pos;
       for (int i = 0; i < 100; i++) {
         float x = sin(a * p.y) - cos(b * p.x);
@@ -267,7 +268,7 @@
   const fragSrc = `
     precision mediump float;
     void main() {
-      gl_FragColor = vec4(1.0, 1.0, 1.0, 0.045);
+      gl_FragColor = vec4(0.75, 0.75, 0.78, 0.038);
     }`;
 
   function compile(type, src) {
@@ -292,8 +293,7 @@
   gl.bufferData(gl.ARRAY_BUFFER, pos, gl.STATIC_DRAW);
 
   function resize() {
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
     if (canvas.width !== w || canvas.height !== h) {
       canvas.width = w; canvas.height = h;
     }
@@ -302,20 +302,16 @@
   function tick(ms) {
     resize();
     gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.clearColor(0, 0, 0, 1);
+    gl.clearColor(0.05, 0.05, 0.05, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
-
     gl.useProgram(prog);
     gl.uniform1f(uTime, ms);
     gl.uniform2f(uRes, canvas.width, canvas.height);
-
     gl.enableVertexAttribArray(aPos);
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
-
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-
     gl.drawArrays(gl.POINTS, 0, N);
     requestAnimationFrame(tick);
   }
