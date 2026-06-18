@@ -16,33 +16,82 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    /* ══════════════════════════════════════════
+       light theme (default)
+       ══════════════════════════════════════════ */
     :root {
-      --paper: #0d0d0d;
+      --bg: #faf7f0;
+      --card-bg: #f5f1e8;
+      --ink: #2a2a2a;
+      --faint: #999;
+      --line: rgba(0,0,0,0.04);
+      --border: rgba(0,0,0,0.08);
+      --border-hover: rgba(0,0,0,0.16);
+      --dash: rgba(0,0,0,0.12);
+      --corner: rgba(0,0,0,0.08);
+      --tape-bg: rgba(0,0,0,0.02);
+      --tape-border: rgba(0,0,0,0.05);
+      --foot-color: #ccc;
+      --shadow-hover: rgba(0,0,0,0.03);
+      --noise-opacity: 0.04;
+      --noise-invert: 0%;
+      --canvas-bg: 0.97,0.96,0.94;
+      --canvas-particle: 0.15,0.13,0.12;
+      --canvas-alpha: 0.035;
+      --canvas-opacity: 0.35;
+      --canvas-mix: multiply;
+      --grid-rgba: rgba(0,0,0,0.035);
+    }
+
+    /* ══════════════════════════════════════════
+       dark theme
+       ══════════════════════════════════════════ */
+    :root.dark {
+      --bg: #0d0d0d;
+      --card-bg: #111111;
       --ink: #d8d8d8;
       --faint: #5a5a5a;
-      --line: rgba(255,255,255,0.025);
-      --card-bg: #111111;
+      --line: rgba(255,255,255,0.018);
+      --border: rgba(255,255,255,0.05);
+      --border-hover: rgba(255,255,255,0.14);
+      --dash: rgba(255,255,255,0.08);
+      --corner: rgba(255,255,255,0.06);
+      --tape-bg: rgba(255,255,255,0.03);
+      --tape-border: rgba(255,255,255,0.04);
+      --foot-color: #222;
+      --shadow-hover: rgba(255,255,255,0.01);
+      --noise-opacity: 0.05;
+      --noise-invert: 100%;
+      --canvas-bg: 0.05,0.05,0.05;
+      --canvas-particle: 0.72,0.72,0.75;
+      --canvas-alpha: 0.038;
+      --canvas-opacity: 0.50;
+      --canvas-mix: screen;
+      --grid-rgba: rgba(255,255,255,0.022);
     }
 
     html, body { height: 100%; }
 
     body {
-      background: var(--paper);
+      background: var(--bg);
       font-family: 'Caveat', cursive;
       color: var(--ink);
       min-height: 100vh;
       position: relative;
       -webkit-font-smoothing: antialiased;
+      transition: background 0.4s ease, color 0.4s ease;
     }
 
     /* ── noise texture ── */
     body::before {
       content: '';
       position: fixed; inset: 0; z-index: 0;
-      opacity: 0.06;
+      opacity: var(--noise-opacity);
+      filter: invert(var(--noise-invert));
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
       background-size: 256px 256px;
       pointer-events: none;
+      transition: opacity 0.4s ease, filter 0.4s ease;
     }
 
     /* ── de Jong canvas ── */
@@ -51,8 +100,9 @@
       top: 0; left: 0;
       width: 100vw; height: 100vh;
       z-index: 1;
-      opacity: 0.50;
-      mix-blend-mode: screen;
+      opacity: var(--canvas-opacity);
+      mix-blend-mode: var(--canvas-mix);
+      transition: opacity 0.4s ease;
     }
 
     /* ── notebook grid ── */
@@ -60,7 +110,7 @@
       position: fixed; inset: 0; z-index: 2;
       pointer-events: none;
       background-image:
-        repeating-linear-gradient(transparent, transparent 31px, var(--line) 31px, var(--line) 32px);
+        repeating-linear-gradient(transparent, transparent 31px, var(--grid-rgba) 31px, var(--grid-rgba) 32px);
       background-size: 100% 32px;
     }
 
@@ -74,23 +124,53 @@
 
     /* ── header ── */
     .hd {
-      display: flex; justify-content: space-between; align-items: baseline;
+      display: flex; justify-content: space-between; align-items: center;
       padding: 0 4px 16px;
-      border-bottom: 1.5px dashed rgba(255,255,255,0.15);
+      border-bottom: 1.5px dashed var(--dash);
       margin-bottom: 40px;
     }
     .logo {
       font-size: 2rem; font-weight: 700;
       letter-spacing: 0.04em;
       transform: rotate(-0.6deg);
+      color: var(--ink);
+      transition: color 0.4s ease;
     }
     .logo-sub {
       font-size: 0.65rem; font-weight: 400;
       color: var(--faint); margin-left: 4px;
+      transition: color 0.4s ease;
     }
     .hd-right {
+      display: flex; align-items: center; gap: 14px;
       font-size: 0.85rem; color: var(--faint);
       transform: rotate(0.4deg);
+      transition: color 0.4s ease;
+    }
+
+    /* ── theme toggle ── */
+    .theme-toggle {
+      background: none; border: 1px solid var(--border);
+      border-radius: 20px;
+      width: 38px; height: 22px;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.2s, background 0.3s;
+      background: var(--card-bg);
+      transform: rotate(0deg);
+    }
+    .theme-toggle:hover { border-color: var(--border-hover); }
+    .theme-toggle::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--ink);
+      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), background 0.4s;
+    }
+    :root.dark .theme-toggle::after {
+      transform: translateX(16px);
     }
 
     /* ── memo card ── */
@@ -100,17 +180,16 @@
       padding: 32px 28px 24px;
       cursor: pointer;
       font-family: 'Caveat', cursive;
-      border: 1.5px solid rgba(255,255,255,0.06);
-      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+      border: 1.5px solid var(--border);
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.4s ease;
     }
     .memo:hover {
-      border-color: rgba(255,255,255,0.18);
-      box-shadow: 0 0 40px rgba(255,255,255,0.02);
+      border-color: var(--border-hover);
+      box-shadow: 0 0 40px var(--shadow-hover);
     }
 
     .memo + .memo { margin-top: 24px; }
 
-    /* subtle per-card rotation */
     .memo:nth-child(1) { transform: rotate(-0.4deg); }
     .memo:nth-child(2) { transform: rotate(0.3deg); }
     .memo:nth-child(3) { transform: rotate(0.5deg); }
@@ -120,74 +199,75 @@
     .memo:nth-child(3):hover { transform: rotate(0.5deg) translateY(-2px); }
     .memo:nth-child(4):hover { transform: rotate(-0.2deg) translateY(-2px); }
 
-    /* ── hand-drawn corner marks ── */
+    /* ── corner marks ── */
     .memo::before {
       content: '';
       position: absolute; top: -1px; left: -1px;
       width: 24px; height: 24px;
-      border-top: 1.5px solid rgba(255,255,255,0.12);
-      border-left: 1.5px solid rgba(255,255,255,0.12);
+      border-top: 1.5px solid var(--corner);
+      border-left: 1.5px solid var(--corner);
       border-radius: 0 0 4px 0;
-      opacity: 0;
-      transition: opacity 0.2s;
+      opacity: 0; transition: opacity 0.2s;
     }
     .memo::after {
       content: '';
       position: absolute; bottom: -1px; right: -1px;
       width: 24px; height: 24px;
-      border-bottom: 1.5px solid rgba(255,255,255,0.12);
-      border-right: 1.5px solid rgba(255,255,255,0.12);
+      border-bottom: 1.5px solid var(--corner);
+      border-right: 1.5px solid var(--corner);
       border-radius: 4px 0 0 0;
-      opacity: 0;
-      transition: opacity 0.2s;
+      opacity: 0; transition: opacity 0.2s;
     }
     .memo:hover::before, .memo:hover::after { opacity: 1; }
 
     .memo-num {
       font-size: 0.7rem; font-weight: 600; color: var(--faint);
       letter-spacing: 0.06em; margin-bottom: 6px;
+      transition: color 0.4s ease;
     }
     .memo-cat {
       font-size: 1.35rem; font-weight: 700;
       letter-spacing: 0.03em; margin-bottom: 4px;
+      color: var(--ink);
+      transition: color 0.4s ease;
     }
     .memo-desc {
       font-size: 0.85rem; color: var(--faint);
       line-height: 1.7;
+      transition: color 0.4s ease;
     }
     .memo-symbol {
       font-family: 'Georgia', 'Times New Roman', serif;
-      font-size: 0.75rem;
-      color: var(--faint);
+      font-size: 0.75rem; color: var(--faint);
       margin-bottom: 8px;
-      font-style: italic;
-      letter-spacing: 0.02em;
+      font-style: italic; letter-spacing: 0.02em;
+      transition: color 0.4s ease;
     }
 
-    /* ── footer ── */
-    .foot {
-      text-align: center; margin-top: 48px;
-      padding-top: 20px;
-      border-top: 1px dashed rgba(255,255,255,0.06);
-    }
-    .foot-text {
-      font-size: 0.7rem; color: #333;
-      letter-spacing: 0.1em; transform: rotate(-0.3deg);
-      display: inline-block;
-    }
-
-    /* ── paper clip / tape hint ── */
+    /* ── tape mark ── */
     .tape {
       position: absolute; top: -12px; left: 50%;
       transform: translateX(-50%) rotate(-2deg);
       width: 36px; height: 14px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.06);
+      background: var(--tape-bg);
+      border: 1px solid var(--tape-border);
       opacity: 0;
       transition: opacity 0.2s;
     }
     .memo:hover .tape { opacity: 1; }
 
+    /* ── footer ── */
+    .foot {
+      text-align: center; margin-top: 48px;
+      padding-top: 20px;
+      border-top: 1px dashed var(--dash);
+    }
+    .foot-text {
+      font-size: 0.7rem; color: var(--foot-color);
+      letter-spacing: 0.1em; transform: rotate(-0.3deg);
+      display: inline-block;
+      transition: color 0.4s ease;
+    }
   </style>
 </head>
 <body>
@@ -197,7 +277,10 @@
 <div class="wrap">
   <header class="hd">
     <span class="logo">mathbarker<span class="logo-sub">.top</span></span>
-    <span class="hd-right">singularity &amp; structure</span>
+    <div class="hd-right">
+      <span>singularity &amp; structure</span>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme"></button>
+    </div>
   </header>
 
   <div class="memo" onclick="location.href='/theory'">
@@ -238,7 +321,9 @@
 </div>
 
 <script>
-/* de Jong attractor — monochrome silver on dark */
+/* ═══════════════════════════════════════════════
+   de Jong attractor — theme-reactive
+   ═══════════════════════════════════════════════ */
 (function(){
   const canvas = document.getElementById('chaosCanvas');
   const gl = canvas.getContext('webgl', {alpha: false}) ||
@@ -267,8 +352,10 @@
 
   const fragSrc = `
     precision mediump float;
+    uniform vec3 u_color;
+    uniform float u_alpha;
     void main() {
-      gl_FragColor = vec4(0.75, 0.75, 0.78, 0.038);
+      gl_FragColor = vec4(u_color, u_alpha);
     }`;
 
   function compile(type, src) {
@@ -281,9 +368,11 @@
   gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fragSrc));
   gl.linkProgram(prog);
 
-  const aPos = gl.getAttribLocation(prog, 'a_pos');
-  const uTime = gl.getUniformLocation(prog, 'u_time');
-  const uRes  = gl.getUniformLocation(prog, 'u_res');
+  const aPos    = gl.getAttribLocation(prog, 'a_pos');
+  const uTime   = gl.getUniformLocation(prog, 'u_time');
+  const uRes    = gl.getUniformLocation(prog, 'u_res');
+  const uColor  = gl.getUniformLocation(prog, 'u_color');
+  const uAlpha  = gl.getUniformLocation(prog, 'u_alpha');
 
   const N = 1 << 20;
   const pos = new Float32Array(N * 2);
@@ -299,24 +388,77 @@
     }
   }
 
+  /* read particle color + bg from CSS vars */
+  let particleColor = [0.15,0.13,0.12];  // light default
+  let particleAlpha = 0.035;
+  let bgColor       = [0.971,0.965,0.941];  // light default
+
+  function readTheme() {
+    const style = getComputedStyle(document.documentElement);
+    const c = style.getPropertyValue('--canvas-particle').trim().split(',').map(Number);
+    const a = parseFloat(style.getPropertyValue('--canvas-alpha').trim());
+    const b = style.getPropertyValue('--canvas-bg').trim().split(',').map(Number);
+    if (c.length === 3) particleColor = c;
+    if (!isNaN(a)) particleAlpha = a;
+    if (b.length === 3) bgColor = b;
+  }
+  readTheme();
+
   function tick(ms) {
     resize();
     gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.clearColor(0.05, 0.05, 0.05, 1);
+    gl.clearColor(bgColor[0], bgColor[1], bgColor[2], 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
+
     gl.useProgram(prog);
     gl.uniform1f(uTime, ms);
     gl.uniform2f(uRes, canvas.width, canvas.height);
+    gl.uniform3f(uColor, particleColor[0], particleColor[1], particleColor[2]);
+    gl.uniform1f(uAlpha, particleAlpha);
+
     gl.enableVertexAttribArray(aPos);
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
     gl.drawArrays(gl.POINTS, 0, N);
     requestAnimationFrame(tick);
   }
 
   requestAnimationFrame(tick);
+
+  /* watch theme toggle */
+  new MutationObserver(() => { readTheme(); }).observe(
+    document.documentElement, { attributes: true, attributeFilter: ['class'] }
+  );
+})();
+</script>
+
+<script>
+/* ═══════════════════════════════════════════════
+   theme toggle
+   ═══════════════════════════════════════════════ */
+(function(){
+  const html = document.documentElement;
+  const btn  = document.getElementById('themeToggle');
+
+  /* prefer system dark → start dark; no preference → light */
+  const saved  = localStorage.getItem('mathbarker-theme');
+  const prefer = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+  if (saved === 'dark' || (!saved && prefer)) {
+    html.classList.add('dark');
+    document.querySelector('meta[name=theme-color]').content = '#0d0d0d';
+  }
+
+  btn.addEventListener('click', () => {
+    html.classList.toggle('dark');
+    const isDark = html.classList.contains('dark');
+    localStorage.setItem('mathbarker-theme', isDark ? 'dark' : 'light');
+    document.querySelector('meta[name=theme-color]').content = isDark ? '#0d0d0d' : '#faf7f0';
+  });
 })();
 </script>
 
