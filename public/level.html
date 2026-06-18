@@ -124,16 +124,24 @@
 <script>
 (function(){
   const m = location.pathname.match(/\/level\/(.+)/);
-  const LEVEL = m ? m[1] : 'basic';  // 'basic' or 'standard'
+  const LEVEL = m ? m[1] : 'basic';
   const LABEL = LEVEL.charAt(0).toUpperCase() + LEVEL.slice(1);
   document.getElementById('hdBadge').textContent = LABEL;
   document.title = 'mathbarker — ' + LABEL;
   document.getElementById('pickTitle').textContent = LABEL;
 
-  /* show subject picker immediately */
-  document.getElementById('subjectPicker').hidden = false;
+  // check ?subject=1a → skip picker
+  const qp = new URLSearchParams(location.search);
+  const preSubject = qp.get('subject');
 
   let subject = null, questions = [], idx = 0, answers = [], startTime;
+
+  if (preSubject) {
+    subject = preSubject;
+    startQuiz();
+  } else {
+    document.getElementById('subjectPicker').hidden = false;
+  }
 
   document.querySelectorAll('.pick-card').forEach(card => {
     card.addEventListener('click', () => {

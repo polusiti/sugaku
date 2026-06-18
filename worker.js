@@ -29,6 +29,9 @@ export default {
     if (url.pathname === '/api/review' && request.method === 'GET') {
       return handleReview(request, env);
     }
+    if (url.pathname === '/api/accuracy' && request.method === 'GET') {
+      return handleAccuracy(request, env);
+    }
 
     /* ── admin auth ── */
     if (url.pathname === '/api/admin/login' && request.method === 'POST') {
@@ -210,6 +213,34 @@ async function handleStats(request, env) {
   }
 }
 
+async function handleAccuracy(request, env) {
+  const h = corsHeaders();
+  try {
+    const url = new URL(request.url);
+    const uuid = url.searchParams.get('uuid');
+    if (!uuid) return json({ error: 'uuid required' }, 400);
+
+    const { results } = await env.MATHBARKER_DB.prepare(
+      `SELECT level, subject_group,
+              COUNT(*) as total,
+              SUM(is_correct) as correct
+       FROM mathbarker_records r
+       JOIN mathbarker_questions q ON r.question_id = q.id
+       WHERE r.user_uuid = ?
+       GROUP BY level, subject_group`
+    ).bind(uuid).all();
+
+    const { c } = await env.MATHBARKER_DB.prepare(
+      `SELECT COUNT(DISTINCT question_id) as c FROM mathbarker_records
+       WHERE user_uuid = ? AND is_correct = 0`
+    ).bind(uuid).first();
+
+    return json({ groups: results, reviewCount: c }, 200, h);
+  } catch (e) {
+    return json({ error: e.message }, 500, h);
+  }
+}
+
 async function handleReview(request, env) {
   const h = corsHeaders();
   try {
@@ -217,7 +248,6 @@ async function handleReview(request, env) {
     const uuid = url.searchParams.get('uuid');
     if (!uuid) return json({ error: 'uuid required' }, 400);
 
-    // latest wrong answers, each question once (most recent attempt)
     const { results } = await env.MATHBARKER_DB.prepare(
       `SELECT DISTINCT question_id FROM mathbarker_records
        WHERE user_uuid = ? AND is_correct = 0

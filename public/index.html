@@ -162,21 +162,24 @@
     :root.dark .theme-toggle::after { transform: translateX(14px); }
 
     /* ── contents ── */
-    .contents-label {
+    .toc { list-style: none; }
+
+    .toc-group {
+      border-top: 1px solid var(--border);
+      padding: 20px 6px 10px;
+    }
+    .toc-group-name {
       font-size: 0.7rem; font-weight: 600;
       color: var(--faint);
       letter-spacing: 0.12em;
-      margin-bottom: 24px;
+      margin-bottom: 12px;
       transition: color 0.4s ease;
     }
 
-    .toc { list-style: none; }
-
     .toc-row {
       display: flex; align-items: baseline;
-      padding: 18px 6px;
+      padding: 12px 4px 12px 20px;
       cursor: pointer;
-      border-bottom: 1px solid var(--border);
       transition: background 0.15s ease, padding-left 0.2s ease;
       font-family: 'Caveat', cursive;
       color: var(--ink);
@@ -184,20 +187,28 @@
     }
     .toc-row:hover {
       background: var(--row-hover);
-      padding-left: 14px;
+      padding-left: 28px;
     }
-    .toc-row:first-child { border-top: 1px solid var(--border); }
+    .toc-row:last-child { border-bottom: none; }
 
-    .toc-num {
-      width: 24px; flex-shrink: 0;
+    .toc-sub {
+      width: 32px; flex-shrink: 0;
       font-size: 0.8rem; font-weight: 600;
       color: var(--faint);
       transition: color 0.4s ease;
     }
-    .toc-title {
-      font-size: 1.35rem; font-weight: 600;
-      letter-spacing: 0.03em;
+    .toc-rate {
+      width: 42px; flex-shrink: 0; text-align: right;
+      font-size: 0.7rem; font-weight: 600;
+      color: var(--faint); letter-spacing: 0.02em;
+      transition: color 0.4s ease;
     }
+
+    .toc-end {
+      border-top: 1px solid var(--border);
+    }
+    .toc-end .toc-row { padding: 18px 6px; }
+    .toc-end .toc-row:last-child { border-bottom: none; }
 
   </style>
 </head>
@@ -264,22 +275,49 @@
   </header>
 
   <div class="toc">
-    <a class="toc-row" href="/level/basic">
-      <span class="toc-num">I</span>
-      <span class="toc-title">Basic</span>
-    </a>
-    <a class="toc-row" href="/level/standard">
-      <span class="toc-num">II</span>
-      <span class="toc-title">Standard</span>
-    </a>
-    <a class="toc-row" href="/random">
-      <span class="toc-num">III</span>
-      <span class="toc-title">Random</span>
-    </a>
-    <a class="toc-row" href="/review">
-      <span class="toc-num">IV</span>
-      <span class="toc-title">Review</span>
-    </a>
+    <!-- Basic -->
+    <div class="toc-group">
+      <div class="toc-group-name">Basic</div>
+      <a class="toc-row" href="/level/basic?subject=1a">
+        <span class="toc-sub">1A</span>
+        <span class="toc-rate" data-key="basic-1a">—</span>
+      </a>
+      <a class="toc-row" href="/level/basic?subject=2b">
+        <span class="toc-sub">2B</span>
+        <span class="toc-rate" data-key="basic-2b">—</span>
+      </a>
+      <a class="toc-row" href="/level/basic?subject=3">
+        <span class="toc-sub">3</span>
+        <span class="toc-rate" data-key="basic-3">—</span>
+      </a>
+    </div>
+
+    <!-- Standard -->
+    <div class="toc-group">
+      <div class="toc-group-name">Standard</div>
+      <a class="toc-row" href="/level/standard?subject=1a">
+        <span class="toc-sub">1A</span>
+        <span class="toc-rate" data-key="standard-1a">—</span>
+      </a>
+      <a class="toc-row" href="/level/standard?subject=2b">
+        <span class="toc-sub">2B</span>
+        <span class="toc-rate" data-key="standard-2b">—</span>
+      </a>
+      <a class="toc-row" href="/level/standard?subject=3">
+        <span class="toc-sub">3</span>
+        <span class="toc-rate" data-key="standard-3">—</span>
+      </a>
+    </div>
+
+    <!-- footer rows -->
+    <div class="toc-end">
+      <a class="toc-row" href="/random">
+        <span class="toc-sub"></span>Random<span class="toc-rate"></span>
+      </a>
+      <a class="toc-row" href="/review" id="reviewRow">
+        <span class="toc-sub"></span>Review<span class="toc-rate" id="reviewBadge"></span>
+      </a>
+    </div>
   </div>
 
 </div>
@@ -291,6 +329,31 @@
   if (!localStorage.getItem(KEY)) {
     localStorage.setItem(KEY, JSON.stringify({ uuid: crypto.randomUUID(), handle: '' }));
   }
+})();
+
+/* ── accuracy ── */
+(async function(){
+  try {
+    const id = JSON.parse(localStorage.getItem('mathbarker_id') || '{}');
+    const r = await fetch('/api/accuracy?uuid=' + (id.uuid || ''));
+    if (!r.ok) return;
+    const data = await r.json();
+
+    // per-group rates
+    for (const g of (data.groups || [])) {
+      const key = g.level + '-' + g.subject_group;
+      const el = document.querySelector(`[data-key="${key}"]`);
+      if (el && g.total > 0) {
+        const pct = Math.round(g.correct / g.total * 100);
+        el.textContent = pct + '%';
+      }
+    }
+    // review count
+    if (data.reviewCount > 0) {
+      const rb = document.getElementById('reviewBadge');
+      if (rb) rb.textContent = data.reviewCount;
+    }
+  } catch(_) {}
 })();
 </script>
 
