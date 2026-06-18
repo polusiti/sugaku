@@ -2,7 +2,21 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    /* ── API ── */
+    /* ── question API ── */
+    if (url.pathname === '/api/questions' && request.method === 'GET') {
+      return handleListQuestions(request, env);
+    }
+    if (url.pathname === '/api/questions' && request.method === 'POST') {
+      return handleCreateQuestion(request, env);
+    }
+    if (url.pathname.startsWith('/api/questions/') && request.method === 'PUT') {
+      return handleUpdateQuestion(request, env, url.pathname);
+    }
+    if (url.pathname.startsWith('/api/questions/') && request.method === 'DELETE') {
+      return handleDeleteQuestion(request, env, url.pathname);
+    }
+
+    /* ── record / stats ── */
     if (url.pathname === '/api/identity' && request.method === 'POST') {
       return handleIdentity(request, env);
     }
@@ -13,9 +27,18 @@ export default {
       return handleStats(request, env);
     }
 
+    /* ── admin auth ── */
+    if (url.pathname === '/api/admin/login' && request.method === 'POST') {
+      return handleAdminLogin(request, env);
+    }
+
     /* ── page routing ── */
     if (url.pathname === '/basic') {
       url.pathname = '/basic.html';
+      return env.ASSETS.fetch(new Request(url, request));
+    }
+    if (url.pathname === '/admin') {
+      url.pathname = '/admin.html';
       return env.ASSETS.fetch(new Request(url, request));
     }
 
@@ -24,11 +47,101 @@ export default {
   }
 };
 
-/* ─────────────────────────────────────
-   POST /api/identity
-   body: { uuid, handle }
-   → upsert user
-───────────────────────────────────── */
+/* ═══════════════════════════════════════════
+   Question CRUD
+   ═══════════════════════════════════════════ */
+
+async function handleListQuestions(request, env) {
+  const h = corsHeaders();
+  const url = new URL(request.url);
+  const level = url.searchParams.get('level') || '';
+  const admin = url.searchParams.get('admin');
+
+  let rows;
+  if (admin === '1') {
+    if (level) {
+      rows = (await env.MATHBARKER_DB.prepare(
+        'SELECT * FROM mathbarker_questions WHERE level = ? ORDER BY category, id'
+      ).bind(level).all()).results;
+    } else {
+      rows = (await env.MATHBARKER_DB.prepare(
+        'SELECT * FROM mathbarker_questions ORDER BY level, category, id'
+      ).all()).results;
+    }
+  } else {
+    if (level) {
+      rows = (await env.MATHBARKER_DB.prepare(
+        'SELECT id, q, explanation, answer FROM mathbarker_questions WHERE level = ? ORDER BY category, id'
+      ).bind(level).all()).results;
+    } else {
+      rows = (await env.MATHBARKER_DB.prepare(
+        'SELECT id, q, explanation, answer FROM mathbarker_questions ORDER BY category, id'
+      ).all()).results;
+    }
+  }
+
+  return json(rows, 200, h);
+}
+
+async function handleCreateQuestion(request, env) {
+  const h = corsHeaders();
+  try {
+    const body = await request.json();
+    const { id, level, category, q, explanation, answer } = body;
+    if (!id || !level || !q || answer === undefined) {
+      return json({ error: 'id, level, q, answer required' }, 400);
+    }
+
+    await env.MATHBARKER_DB.prepare(
+      'INSERT OR REPLACE INTO mathbarker_questions (id, level, category, q, explanation, answer, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))'
+    ).bind(id, level, category || '', q, explanation || '', answer).run();
+
+    return json({ ok: true, id }, 200, h);
+  } catch (e) {
+    return json({ error: e.message }, 500, h);
+  }
+}
+
+async function handleUpdateQuestion(request, env, path) {
+  const h = corsHeaders();
+  const id = path.replace('/api/questions/', '');
+  try {
+    const body = await request.json();
+    const existing = await env.MATHBARKER_DB.prepare(
+      'SELECT id FROM mathbarker_questions WHERE id = ?'
+    ).bind(id).first();
+    if (!existing) return json({ error: 'not found' }, 404);
+
+    const sets = [], vals = [];
+    for (const k of ['level','category','q','explanation','answer']) {
+      if (body[k] !== undefined) { sets.push(k+'=?'); vals.push(body[k]); }
+    }
+    if (!sets.length) return json({ error: 'no fields' }, 400);
+    vals.push(id);
+
+    await env.MATHBARKER_DB.prepare(
+      `UPDATE mathbarker_questions SET ${sets.join(',')}, updated_at=datetime('now') WHERE id = ?`
+    ).bind(...vals).run();
+
+    return json({ ok: true, id }, 200, h);
+  } catch (e) {
+    return json({ error: e.message }, 500, h);
+  }
+}
+
+async function handleDeleteQuestion(request, env, path) {
+  const h = corsHeaders();
+  const id = path.replace('/api/questions/', '');
+  await env.MATHBARKER_DB.prepare(
+    'DELETE FROM mathbarker_questions WHERE id = ?'
+  ).bind(id).run();
+  return json({ ok: true, id }, 200, h);
+}
+
+/* ═══════════════════════════════════════════
+   Identity / Record / Stats
+   ═══════════════════════════════════════════ */
+
 async function handleIdentity(request, env) {
   const h = corsHeaders();
   try {
@@ -37,8 +150,7 @@ async function handleIdentity(request, env) {
     if (handle.length > 40) return json({ error: 'handle too long' }, 400);
 
     const existing = await env.MATHBARKER_DB
-      .prepare('SELECT uuid FROM mathbarker_users WHERE uuid = ?')
-      .bind(uuid).first();
+      .prepare('SELECT uuid FROM mathbarker_users WHERE uuid = ?').bind(uuid).first();
 
     if (existing) {
       await env.MATHBARKER_DB
@@ -49,27 +161,20 @@ async function handleIdentity(request, env) {
         .prepare('INSERT INTO mathbarker_users (uuid, handle) VALUES (?, ?)')
         .bind(uuid, handle).run();
     }
-
     return json({ ok: true, uuid, handle }, 200, h);
   } catch (e) {
     return json({ error: e.message }, 500, h);
   }
 }
 
-/* ─────────────────────────────────────
-   POST /api/record
-   body: { uuid, handle, question_id, answer, is_correct, time_ms }
-───────────────────────────────────── */
 async function handleRecord(request, env) {
   const h = corsHeaders();
   try {
     const { uuid, handle, question_id, answer, is_correct, time_ms } = await request.json();
     if (!uuid || !question_id) return json({ error: 'uuid and question_id required' }, 400);
 
-    // ensure user exists (lazy registration)
     const user = await env.MATHBARKER_DB
-      .prepare('SELECT uuid FROM mathbarker_users WHERE uuid = ?')
-      .bind(uuid).first();
+      .prepare('SELECT uuid FROM mathbarker_users WHERE uuid = ?').bind(uuid).first();
     if (!user) {
       await env.MATHBARKER_DB
         .prepare('INSERT INTO mathbarker_users (uuid, handle) VALUES (?, ?)')
@@ -86,10 +191,6 @@ async function handleRecord(request, env) {
   }
 }
 
-/* ─────────────────────────────────────
-   GET /api/stats?uuid=xxx
-   → { total, correct, avg_time_ms }
-───────────────────────────────────── */
 async function handleStats(request, env) {
   const h = corsHeaders();
   try {
@@ -104,8 +205,7 @@ async function handleStats(request, env) {
     ]);
 
     return json({
-      total: total.c,
-      correct: correct.c,
+      total: total.c, correct: correct.c,
       avg_time_ms: Math.round(time.avg || 0),
     }, 200, h);
   } catch (e) {
@@ -113,17 +213,34 @@ async function handleStats(request, env) {
   }
 }
 
+/* ═══════════════════════════════════════════
+   Admin
+   ═══════════════════════════════════════════ */
+
+async function handleAdminLogin(request, env) {
+  try {
+    const { password } = await request.json();
+    if (password === env.ADMIN_TOKEN) {
+      return json({ token: env.ADMIN_TOKEN });
+    }
+    return json({ error: 'Incorrect' }, 401);
+  } catch (e) {
+    return json({ error: e.message }, 400);
+  }
+}
+
+/* ═══════════════════════════════════════════ */
+
 function json(data, status = 200, extra = {}) {
   return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...extra },
+    status, headers: { 'Content-Type': 'application/json', ...extra },
   });
 }
 
 function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
 }
