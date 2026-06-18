@@ -54,15 +54,38 @@
     .result-label{font-size:0.8rem;color:var(--faint);letter-spacing:0.06em;margin-bottom:28px}
     .stats{font-size:0.78rem;color:var(--faint);line-height:1.8}
     .loading{text-align:center;padding:56px 0;color:var(--faint)}
+    .rule-btn{background:none;border:none;padding:0;font-family:'Caveat',cursive;font-size:0.72rem;font-weight:600;letter-spacing:0.1em;color:var(--faint);cursor:pointer;transition:color 0.2s}
+    .rule-btn:hover{color:var(--ink)}
+    .rovl{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.16s}
+    .rovl.open{opacity:1;pointer-events:auto}
+    .rpanel{background:var(--bg);border:1px solid var(--dash);padding:28px 24px 22px;width:calc(100% - 48px);max-width:360px;transition:background 0.4s,border-color 0.4s}
+    .rphd{font-size:0.58rem;font-weight:700;letter-spacing:0.18em;color:var(--faint);margin-bottom:18px}
+    .rrow{display:flex;gap:14px;margin-bottom:11px;font-size:0.88rem;line-height:1.5}
+    .rk{flex-shrink:0;width:18px;font-size:0.58rem;font-weight:700;letter-spacing:0.04em;color:var(--faint);padding-top:3px}
+    .rv{color:var(--ink)}
+    .rs{font-size:0.7rem;color:var(--faint);margin-top:2px}
+    .rex{margin-top:16px;border-top:1px solid var(--border);padding-top:13px;font-size:0.76rem;line-height:2;color:var(--faint)}
     [hidden]{display:none!important}
   </style>
 </head>
 <body>
+<div class="rovl" id="rovl">
+  <div class="rpanel" id="rpanel">
+    <div class="rphd">RULE</div>
+    <div class="rrow"><span class="rk">R1</span><span class="rv">整理してから答える<div class="rs">約分・有理化・計算できるべき乗（小数禁止）</div></span></div>
+    <div class="rrow"><span class="rk">R2</span><span class="rv">見える数字をすべて足す<div class="rs">書かれていない係数 1・√ の指数 2 は除く</div></span></div>
+    <div class="rrow"><span class="rk">R3</span><span class="rv">符号は無視する</span></div>
+    <div class="rrow"><span class="rk">R4</span><span class="rv">π・e は無視する<div class="rs">係数の数字は含める</div></span></div>
+    <div class="rrow"><span class="rk">R5</span><span class="rv">文字は代入後に適用する</span></div>
+    <div class="rex">$e + \sqrt[3]{4} + \log_2 3 + \dfrac{\pi}{3} + 11$<br>$= 3+4+2+3+3+11 = 26$</div>
+  </div>
+</div>
 <div class="wrap">
   <header class="hd">
     <a class="back" href="/">← mathbarker</a>
     <div style="display:flex;align-items:center;gap:12px">
       <span class="hd-badge" id="hdBadge"></span>
+      <button class="rule-btn" id="ruleBtn">rule</button>
       <button class="tgl" id="themeToggle"></button>
     </div>
   </header>
@@ -238,6 +261,20 @@
     if(e.key==='ArrowRight'&&answers[idx]){next()}
     if(e.key==='ArrowLeft'){prev()}
   });
+})();
+</script>
+<script>
+(function(){
+  var o=document.getElementById('rovl'),p=document.getElementById('rpanel');
+  document.getElementById('ruleBtn').addEventListener('click',function(){
+    o.classList.add('open');
+    if(!p.dataset.r&&window.renderMathInElement){
+      renderMathInElement(p,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});
+      p.dataset.r='1';
+    }
+  });
+  o.addEventListener('click',function(e){if(e.target===o)o.classList.remove('open')});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')o.classList.remove('open')});
 })();
 </script>
 </body>
