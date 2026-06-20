@@ -332,6 +332,139 @@ async function deleteSet(id) {
   await loadAllData();
 }
 
+/* ─── Import Panel ─── */
+var _importData = null;
+
+function showImportPanel() {
+  _activeSetId = null;
+  document.getElementById('mpEmpty').hidden = true;
+  document.getElementById('setPanel').hidden = true;
+  document.getElementById('importPanel').hidden = false;
+  renderTree();
+}
+
+function cancelImport() {
+  _importData = null;
+  document.getElementById('importPanel').hidden = true;
+  document.getElementById('ipPreview').hidden = true;
+  document.getElementById('ipErr').hidden = true;
+  document.getElementById('mpEmpty').hidden = false;
+}
+
+function clearImport() {
+  document.getElementById('ipJson').value = '';
+  document.getElementById('ipPreview').hidden = true;
+  document.getElementById('ipErr').hidden = true;
+  _importData = null;
+}
+
+function parseAndPreview() {
+  var raw = (document.getElementById('ipJson').value || '').trim();
+  var errEl = document.getElementById('ipErr');
+  errEl.hidden = true;
+
+  var data;
+  try { data = JSON.parse(raw); } catch(e) {
+    errEl.textContent = 'JSON parse error: ' + e.message;
+    errEl.hidden = false;
+    return;
+  }
+
+  if (!data.set || !data.set.id) { showErr('set.id が必要です'); return; }
+  if (!Array.isArray(data.problems) || !data.problems.length) { showErr('problems 配列が必要です'); return; }
+  for (var i = 0; i < data.problems.length; i++) {
+    var p = data.problems[i];
+    if (!p.id)            { showErr('problems[' + i + '].id が必要です'); return; }
+    if (p.ans === undefined) { showErr('problems[' + i + '].ans が必要です'); return; }
+  }
+
+  _importData = data;
+
+  document.getElementById('ipSetId').value  = data.set.id || '';
+  document.getElementById('ipSubj').value   = data.set.subject || '1A';
+  document.getElementById('ipMode').value   = data.set.mode || 'standard';
+  document.getElementById('ipTitle').value  = data.set.title || '';
+  document.getElementById('ipCtxTa').value  = data.context || '';
+
+  renderImportProblems(data.problems);
+  document.getElementById('ipPreview').hidden = false;
+  debPreview('ipCtxTa', 'ipCtxPv');
+
+  function showErr(msg) { errEl.textContent = msg; errEl.hidden = false; }
+}
+
+function renderImportProblems(probs) {
+  var html = '';
+  probs.forEach(function(p, i) {
+    html += '<div class="ip-prob">'
+      + '<div class="ip-prob-hd">'
+      +   '<span class="prob-n" style="margin-right:6px">(' + (i+1) + ')</span>'
+      +   '<div style="flex:0 0 auto"><div class="pf-lbl">ID</div>'
+      +     '<input class="pf-in" id="ipProbId-' + i + '" value="' + esc(p.id || '') + '" style="width:90px"></div>'
+      +   '<div style="flex:0 0 auto;margin-left:10px"><div class="pf-lbl">ans</div>'
+      +     '<input class="pf-in" id="ipProbAns-' + i + '" type="number" value="' + (p.ans !== undefined ? p.ans : '') + '" style="width:70px"></div>'
+      +   '<div style="flex:0 0 auto;margin-left:10px"><div class="pf-lbl">status</div>'
+      +     '<select class="pf-sel" id="ipProbStatus-' + i + '" style="width:80px">'
+      +       opt2('draft', p.status || 'draft') + opt2('live', p.status || 'draft') + opt2('broken', p.status || 'draft')
+      +     '</select></div>'
+      + '</div>'
+      + '<div class="pf-lbl" style="margin-top:10px">q (LaTeX)</div>'
+      + '<div class="pf-split">'
+      +   '<textarea class="pf-ta" id="ipProbQ-' + i + '" oninput="debPreview(\'ipProbQ-' + i + '\',\'ipProbQPv-' + i + '\')">'
+      +     esc(p.q || '') + '</textarea>'
+      +   '<div class="pf-pv" id="ipProbQPv-' + i + '"></div>'
+      + '</div>'
+      + '<div class="pf-lbl" style="margin-top:8px">explanation</div>'
+      + '<div class="pf-split">'
+      +   '<textarea class="pf-ta" id="ipProbExp-' + i + '" oninput="debPreview(\'ipProbExp-' + i + '\',\'ipProbExpPv-' + i + '\')">'
+      +     esc(p.explanation || '') + '</textarea>'
+      +   '<div class="pf-pv" id="ipProbExpPv-' + i + '"></div>'
+      + '</div>'
+      + '</div>';
+  });
+  document.getElementById('ipProblems').innerHTML = html;
+  probs.forEach(function(_, i) {
+    setTimeout(function() {
+      debPreview('ipProbQ-' + i, 'ipProbQPv-' + i);
+      debPreview('ipProbExp-' + i, 'ipProbExpPv-' + i);
+    }, 0);
+  });
+}
+
+async function executeImport() {
+  if (!_importData) return;
+
+  var setId   = (document.getElementById('ipSetId').value || '').trim();
+  var subject = document.getElementById('ipSubj').value;
+  var mode    = document.getElementById('ipMode').value;
+  var title   = (document.getElementById('ipTitle').value || '').trim();
+  var context = (document.getElementById('ipCtxTa').value || '').trim();
+  if (!setId) { alert('set id が必要です'); return; }
+
+  var probIds = [];
+  var n = _importData.problems.length;
+  for (var i = 0; i < n; i++) {
+    var pid    = (document.getElementById('ipProbId-' + i).value || '').trim();
+    var ans    = parseInt(document.getElementById('ipProbAns-' + i).value, 10);
+    var status = document.getElementById('ipProbStatus-' + i).value;
+    var q      = (document.getElementById('ipProbQ-' + i).value || '').trim();
+    var exp    = (document.getElementById('ipProbExp-' + i).value || '').trim();
+    if (!pid || isNaN(ans)) { alert('problem ' + (i+1) + ': id と ans が必要です'); return; }
+    var ok = await api('POST', '/api/problems', {id: pid, subject, mode, topic: title, status, q, ans, explanation: exp});
+    if (!ok) { alert('problem ' + pid + ' の作成に失敗しました'); return; }
+    probIds.push(pid);
+  }
+
+  var ok = await api('POST', '/api/sets', {id: setId, subject, mode, title, context, problem_ids: probIds});
+  if (!ok) { alert('set ' + setId + ' の作成に失敗しました'); return; }
+
+  _importData = null;
+  document.getElementById('importPanel').hidden = true;
+  document.getElementById('ipPreview').hidden = true;
+  await loadAllData();
+  selectSet(setId);
+}
+
 /* ─── KaTeX preview ─── */
 var _pvTimers = {};
 function debPreview(taId, pvId) {

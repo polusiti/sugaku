@@ -145,6 +145,22 @@
 
     .s-live{color:#2a7a2a}.s-broken{color:#a02020}.s-draft{color:#888}
 
+    /* import panel */
+    .ip{padding:22px 28px 40px}
+    .ip-hd{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+    .ip-hd-title{font-size:0.88rem;font-weight:600}
+    .ip-ta{width:100%;min-height:140px;resize:vertical;background:none;
+      border:1px solid var(--border);font-family:monospace;font-size:0.75rem;
+      color:var(--ink);padding:10px;outline:none;line-height:1.55}
+    .ip-ta:focus{border-color:var(--faint)}
+    .ip-err{margin-top:8px;font-size:0.75rem;color:#c44;padding:6px 10px;
+      border:1px solid #c44;background:rgba(204,68,68,0.04)}
+    .ip-prob{border:1px solid var(--border);padding:14px 14px 12px;margin-bottom:10px}
+    .ip-prob-hd{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+    .ip-schema{font-size:0.68rem;color:var(--faint);font-family:monospace;
+      background:var(--hover);border:1px solid var(--border);
+      padding:10px 12px;line-height:1.7;margin-top:6px;white-space:pre-wrap}
+
     /* new set inline form */
     .ns-form{padding:12px 12px 10px;border-top:1px solid var(--border)}
     .ns-in,.ns-sel{width:100%;background:none;border:none;border-bottom:1px solid var(--border);
@@ -188,7 +204,10 @@
     </div>
     <div class="sb-tree" id="sbTree"></div>
     <div class="sb-bot">
-      <button class="btn btn-sm" onclick="toggleNsForm()">+ New Set</button>
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <button class="btn btn-sm" onclick="toggleNsForm()">+ New Set</button>
+        <button class="btn btn-sm" onclick="showImportPanel()">Import JSON</button>
+      </div>
       <div class="ns-form" id="nsForm" hidden>
         <div class="pf-lbl" style="margin-top:10px">ID</div>
         <input class="ns-in" id="nsId" placeholder="m031">
@@ -223,6 +242,64 @@
   <div class="main" id="mainPanel">
     <div class="mp-empty" id="mpEmpty">← select a set</div>
     <div class="sp" id="setPanel" hidden></div>
+
+    <!-- ── Import Panel ── -->
+    <div class="ip" id="importPanel" hidden>
+      <div class="ip-hd">
+        <span class="ip-hd-title">Import from JSON</span>
+        <button class="btn btn-sm btn-ghost" onclick="cancelImport()">← Back</button>
+      </div>
+
+      <div class="sec-hd">schema</div>
+      <div class="ip-schema">{
+  "set": { "id": "m031", "subject": "3", "mode": "standard", "title": "..." },
+  "context": "LaTeX — 大問共通の問題文",
+  "problems": [
+    { "id": "p058", "q": "(1) ...", "ans": 10, "explanation": "..." },
+    { "id": "p059", "q": "(2) ...", "ans": 6,  "explanation": "..." }
+  ]
+}</div>
+
+      <div class="sec-hd" style="margin-top:20px">paste JSON</div>
+      <textarea class="ip-ta" id="ipJson" placeholder="上のschemaに従ったJSONを貼り付ける"></textarea>
+      <div class="pf-btns" style="margin-top:8px">
+        <button class="btn btn-sm" onclick="parseAndPreview()">Parse &amp; Preview</button>
+        <button class="btn btn-sm btn-ghost" onclick="clearImport()">Clear</button>
+      </div>
+      <div class="ip-err" id="ipErr" hidden></div>
+
+      <div id="ipPreview" hidden>
+        <div class="sec-hd" style="margin-top:24px">set metadata</div>
+        <div class="pf-row pf-r3" style="margin-bottom:10px">
+          <div><div class="pf-lbl">ID</div><input class="pf-in" id="ipSetId"></div>
+          <div><div class="pf-lbl">Subject</div>
+            <select class="pf-sel" id="ipSubj">
+              <option value="1A">1A</option><option value="2B">2B</option><option value="3">3</option>
+            </select>
+          </div>
+          <div><div class="pf-lbl">Mode</div>
+            <select class="pf-sel" id="ipMode">
+              <option value="standard">standard</option><option value="basic">basic</option>
+            </select>
+          </div>
+        </div>
+        <div><div class="pf-lbl">Title</div><input class="pf-in" id="ipTitle" style="width:100%"></div>
+
+        <div class="sec-hd" style="margin-top:20px">context</div>
+        <div class="ctx-split">
+          <textarea class="ctx-ta" id="ipCtxTa" oninput="debPreview('ipCtxTa','ipCtxPv')"></textarea>
+          <div class="ctx-pv" id="ipCtxPv"></div>
+        </div>
+
+        <div class="sec-hd" style="margin-top:20px">problems</div>
+        <div id="ipProblems"></div>
+
+        <div class="pf-btns" style="margin-top:20px">
+          <button class="btn" onclick="executeImport()">Import to DB</button>
+          <button class="btn btn-ghost" onclick="cancelImport()">Cancel</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
