@@ -5,209 +5,242 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>mathbarker — Admin</title>
   <link rel="icon" href="/favicon.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg: #faf7f0; --ink: #2a2a2a; --faint: #999;
-      --border: rgba(0,0,0,0.08); --row-hover: rgba(0,0,0,0.02);
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#f8f8f8;--ink:#1a1a1a;--faint:#888;
+      --border:rgba(0,0,0,0.10);--hover:rgba(0,0,0,0.03);
+      --font:system-ui,-apple-system,'Segoe UI',sans-serif;
+      --sb:240px;
     }
-    :root.dark {
-      --bg: #0d0d0d; --ink: #d8d8d8; --faint: #4a4a4a;
-      --border: rgba(255,255,255,0.06); --row-hover: rgba(255,255,255,0.015);
+    :root.dark{
+      --bg:#0d0d0d;--ink:#d4d4d4;--faint:#555;
+      --border:rgba(255,255,255,0.08);--hover:rgba(255,255,255,0.03);
     }
-    html, body { height: 100%; }
-    body {
-      background: var(--bg);
-      font-family: 'Caveat', cursive;
-      color: var(--ink);
-      min-height: 100vh;
-      transition: background 0.4s, color 0.4s;
-    }
-    .wrap { width: 100%; max-width: 860px; margin: 0 auto; padding: 32px 24px; }
+    html,body{height:100%;overflow:hidden}
+    body{background:var(--bg);font-family:var(--font);color:var(--ink);display:flex;flex-direction:column}
 
-    .hd {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 28px;
-    }
-    .logo { font-size: 1.4rem; font-weight: 700; letter-spacing: 0.03em; }
-    .hd a { color: var(--faint); text-decoration: none; font-size: 0.8rem; }
+    /* header */
+    .hd{display:flex;justify-content:space-between;align-items:center;
+      padding:0 16px;border-bottom:1px solid var(--border);
+      height:44px;flex-shrink:0}
+    .logo{font-size:0.88rem;font-weight:600;letter-spacing:0.04em}
+    .hd-r{display:flex;align-items:center;gap:12px}
+    .hd-r a{color:var(--faint);text-decoration:none;font-size:0.75rem}
+    .theme-tgl{background:var(--bg);border:1px solid var(--border);border-radius:20px;
+      width:32px;height:18px;cursor:pointer;position:relative}
+    .theme-tgl::after{content:'';position:absolute;top:2px;left:2px;
+      width:12px;height:12px;border-radius:50%;background:var(--ink);transition:transform 0.25s}
+    :root.dark .theme-tgl::after{transform:translateX(14px)}
 
     /* login */
-    .login-card {
-      border: 1px solid var(--border); padding: 36px 28px;
-      max-width: 340px; margin: 40px auto; text-align: center;
-    }
-    .login-card input {
-      width: 100%; padding: 8px 4px;
-      background: none; border: none;
-      border-bottom: 1.5px dashed var(--border);
-      font-family: 'Caveat', cursive; font-size: 1rem;
-      color: var(--ink); outline: none; margin-bottom: 16px;
-    }
-    .btn {
-      padding: 8px 28px; background: none;
-      border: 1px solid var(--border);
-      font-family: 'Caveat', cursive; font-size: 0.95rem;
-      color: var(--ink); cursor: pointer;
-      transition: border-color 0.2s;
-    }
-    .btn:hover { border-color: var(--faint); }
+    .login-wrap{flex:1;display:flex;align-items:center;justify-content:center}
+    .login-card{border:1px solid var(--border);padding:32px 28px;width:280px;text-align:center}
+    .login-card input{
+      width:100%;padding:8px 6px;background:none;border:none;
+      border-bottom:1px solid var(--border);font-family:var(--font);
+      font-size:0.88rem;color:var(--ink);outline:none;margin-bottom:18px}
 
-    /* table */
-    .toolbar { display: flex; justify-content: space-between; margin-bottom: 16px; }
-    .q-table { width: 100%; border-collapse: collapse; }
-    .q-table th, .q-table td {
-      padding: 10px 8px; text-align: left;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.9rem;
-    }
-    .q-table th { font-size: 0.7rem; letter-spacing: 0.06em; color: var(--faint); font-weight: 600; }
-    .q-row:hover { background: var(--row-hover); }
-    .q-td-id { max-width: 140px; word-break: break-all; font-size: 0.78rem; }
-    .q-td-lv { width: 60px; }
-    .q-td-sub { width: 40px; font-size: 0.78rem; }
-    .q-td-cat { width: 80px; font-size: 0.78rem; }
-    .q-td-q { min-width: 200px; }
-    .q-td-ans { width: 50px; text-align: center; }
-    .q-td-act { width: 80px; }
-    .act-btn {
-      background: none; border: none;
-      font-family: 'Caveat', cursive; font-size: 0.78rem;
-      cursor: pointer; color: var(--faint);
-      padding: 2px 6px;
-    }
-    .act-btn:hover { color: var(--ink); }
-    .act-btn.del:hover { color: #c44; }
+    /* common button */
+    .btn{padding:5px 18px;background:none;border:1px solid var(--border);
+      font-family:var(--font);font-size:0.78rem;color:var(--ink);cursor:pointer;transition:border-color 0.15s}
+    .btn:hover{border-color:var(--faint)}
+    .btn-sm{padding:3px 12px;font-size:0.72rem}
+    .btn-ghost{border-color:transparent;color:var(--faint)}
+    .btn-ghost:hover{border-color:var(--border);color:var(--ink)}
 
-    /* editor */
-    .editor {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.3);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 10;
-    }
-    .editor-card {
-      background: var(--bg); border: 1px solid var(--border);
-      padding: 32px 28px; width: 100%; max-width: 600px;
-      max-height: 90vh; overflow-y: auto;
-    }
-    .editor-card h3 { margin-bottom: 20px; font-size: 1.1rem; }
-    .editor-card label {
-      display: block; font-size: 0.72rem; color: var(--faint);
-      letter-spacing: 0.04em; margin-bottom: 4px; margin-top: 14px;
-    }
-    .editor-card input, .editor-card textarea, .editor-card select {
-      width: 100%; padding: 8px 4px;
-      background: none; border: none;
-      border-bottom: 1px solid var(--border);
-      font-family: 'Caveat', cursive; font-size: 0.95rem;
-      color: var(--ink); outline: none;
-    }
-    .editor-card textarea { min-height: 80px; resize: vertical; }
-    .editor-card input:focus, .editor-card textarea:focus { border-bottom-color: var(--faint); }
-    .editor-btns { display: flex; gap: 10px; margin-top: 24px; }
+    /* shell */
+    .shell{display:grid;grid-template-columns:var(--sb) 1fr;flex:1;overflow:hidden}
 
-    .ht { display: flex; align-items: center; gap: 12px; }
-    .theme-toggle {
-      background: none; border: 1px solid var(--border);
-      border-radius: 20px; width: 34px; height: 20px;
-      cursor: pointer; position: relative;
-      background: var(--bg); transition: border-color 0.2s;
-    }
-    .theme-toggle::after {
-      content: ''; position: absolute; top: 2px; left: 2px;
-      width: 14px; height: 14px; border-radius: 50%;
-      background: var(--ink);
-      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
-    }
-    :root.dark .theme-toggle::after { transform: translateX(14px); }
+    /* sidebar */
+    .sidebar{border-right:1px solid var(--border);overflow-y:auto;
+      display:flex;flex-direction:column;background:var(--bg)}
+    .sb-top{padding:10px 12px;border-bottom:1px solid var(--border);display:flex;gap:6px}
+    .sb-select{flex:1;background:none;border:1px solid var(--border);
+      font-family:var(--font);font-size:0.72rem;color:var(--ink);padding:3px 5px;outline:none}
+    .sb-tree{flex:1;padding-bottom:8px}
+    .sb-grp{font-size:0.58rem;letter-spacing:0.10em;text-transform:uppercase;
+      color:var(--faint);font-weight:600;padding:10px 12px 4px;
+      border-top:1px solid var(--border);margin-top:4px}
+    .sb-grp:first-child{border-top:none;margin-top:0}
+    .sb-item{display:block;width:100%;padding:6px 12px 6px 18px;
+      background:none;border:none;text-align:left;font-family:var(--font);
+      font-size:0.8rem;color:var(--ink);cursor:pointer;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background 0.1s}
+    .sb-item:hover{background:var(--hover)}
+    .sb-item.active{background:var(--hover);font-weight:600}
+    .sb-cnt{font-size:0.65rem;color:var(--faint);margin-left:4px}
+    .sb-bot{padding:10px 12px;border-top:1px solid var(--border);flex-shrink:0}
+    .sb-bot .btn{width:100%;text-align:left}
+
+    /* main */
+    .main{overflow-y:auto}
+    .mp-empty{display:flex;align-items:center;justify-content:center;
+      height:100%;color:var(--faint);font-size:0.85rem}
+
+    /* set panel */
+    .sp{padding:22px 28px 40px}
+    .sp-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+    .sp-id{font-size:0.7rem;color:var(--faint);font-family:monospace;flex-shrink:0}
+    .sp-sel{background:none;border:1px solid var(--border);font-family:var(--font);
+      font-size:0.73rem;color:var(--ink);padding:3px 6px;outline:none}
+    .sp-title{flex:1;min-width:180px;background:none;border:none;
+      border-bottom:1px solid var(--border);font-family:var(--font);
+      font-size:0.95rem;font-weight:600;color:var(--ink);padding:3px 2px;outline:none}
+    .sp-title:focus{border-bottom-color:var(--ink)}
+
+    .sec-hd{font-size:0.58rem;letter-spacing:0.10em;text-transform:uppercase;
+      color:var(--faint);font-weight:600;margin-bottom:8px;margin-top:22px}
+
+    /* context split */
+    .ctx-split{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .ctx-ta{width:100%;min-height:110px;resize:vertical;background:none;
+      border:1px solid var(--border);font-family:monospace;font-size:0.78rem;
+      color:var(--ink);padding:9px 10px;outline:none;line-height:1.6}
+    .ctx-ta:focus{border-color:var(--faint)}
+    .ctx-pv{border:1px dashed var(--border);padding:9px 12px;min-height:60px;
+      font-family:Georgia,'Noto Serif',serif;font-size:0.88rem;line-height:1.85;
+      color:var(--ink);white-space:pre-wrap;word-break:break-word}
+    .ctx-pv:empty::before{content:'—';color:var(--faint);font-style:italic}
+
+    /* problem list */
+    .prob-list{border:1px solid var(--border);margin-top:2px}
+    .prob-row{border-top:1px solid var(--border)}
+    .prob-row:first-child{border-top:none}
+    .prob-hd{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:default}
+    .prob-hd:hover .prob-edt{opacity:1}
+    .prob-n{font-size:0.68rem;color:var(--faint);min-width:20px;flex-shrink:0;font-family:monospace}
+    .prob-q{flex:1;font-size:0.83rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .prob-ans{font-size:0.68rem;color:var(--faint);font-family:monospace;flex-shrink:0}
+    .prob-sdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+    .prob-edt{opacity:0;background:none;border:none;font-size:0.68rem;color:var(--faint);
+      cursor:pointer;padding:2px 6px;flex-shrink:0;font-family:var(--font)}
+    .prob-edt:hover{color:var(--ink)}
+    .prob-del{opacity:0;background:none;border:none;font-size:0.68rem;color:var(--faint);
+      cursor:pointer;padding:2px 4px;flex-shrink:0;font-family:var(--font)}
+    .prob-del:hover{color:#c44}
+    .prob-hd:hover .prob-del{opacity:1}
+
+    /* inline form */
+    .prob-form{padding:14px 14px 16px;border-top:1px solid var(--border);
+      background:var(--hover)}
+    .pf-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+    .pf-r3{grid-template-columns:1fr 1fr 1fr}
+    .pf-lbl{font-size:0.58rem;letter-spacing:0.07em;text-transform:uppercase;
+      color:var(--faint);margin-bottom:3px}
+    .pf-in,.pf-sel{width:100%;background:none;border:none;border-bottom:1px solid var(--border);
+      font-family:var(--font);font-size:0.82rem;color:var(--ink);padding:4px 2px;outline:none}
+    .pf-in:focus,.pf-sel:focus{border-bottom-color:var(--ink)}
+    .pf-ta{width:100%;min-height:72px;resize:vertical;background:none;
+      border:1px solid var(--border);font-family:monospace;font-size:0.77rem;
+      color:var(--ink);padding:7px 8px;outline:none;line-height:1.5}
+    .pf-ta:focus{border-color:var(--faint)}
+    .pf-split{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+    .pf-pv{border:1px dashed var(--border);padding:7px 10px;min-height:50px;
+      font-family:Georgia,serif;font-size:0.82rem;line-height:1.75;
+      color:var(--ink);white-space:pre-wrap;word-break:break-word}
+    .pf-pv:empty::before{content:'—';color:var(--faint);font-style:italic}
+    .pf-btns{display:flex;gap:8px;margin-top:10px}
+
+    .s-live{color:#2a7a2a}.s-broken{color:#a02020}.s-draft{color:#888}
+
+    /* new set inline form */
+    .ns-form{padding:12px 12px 10px;border-top:1px solid var(--border)}
+    .ns-in,.ns-sel{width:100%;background:none;border:none;border-bottom:1px solid var(--border);
+      font-family:var(--font);font-size:0.78rem;color:var(--ink);
+      padding:4px 2px;outline:none;margin-bottom:8px}
+    .ns-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="hd">
-    <span class="logo">mathbarker · admin</span>
-    <div class="ht">
-      <a href="/">← home</a>
-      <button class="theme-toggle" id="themeToggle"></button>
-    </div>
-  </header>
 
-  <!-- login -->
-  <div class="login-card" id="loginCard">
+<header class="hd">
+  <span class="logo">mathbarker · admin</span>
+  <div class="hd-r">
+    <a href="/">← home</a>
+    <button class="theme-tgl" id="themeToggle"></button>
+  </div>
+</header>
+
+<div class="login-wrap" id="loginWrap">
+  <div class="login-card">
     <input type="password" id="adminPw" placeholder="password" autocomplete="off">
-    <button class="btn" onclick="login()">Login</button>
-  </div>
-
-  <!-- admin -->
-  <div id="adminCard">
-    <div class="toolbar">
-      <span style="font-size:0.75rem;color:var(--faint)">questions</span>
-      <button class="btn" onclick="newQ()">+ New</button>
-    </div>
-
-    <table class="q-table">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Level</th>
-          <th>Subj</th>
-          <th>Category</th>
-          <th>Question</th>
-          <th>Ans</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="qTable"></tbody>
-    </table>
+    <button class="btn" id="loginBtn">Login</button>
   </div>
 </div>
 
-<!-- editor modal -->
-<div class="editor" id="editor" style="display:none">
-  <div class="editor-card">
-    <h3 id="editorTitle">New Question</h3>
-    <label>ID</label>
-    <input id="qId" placeholder="basic-algebra-002">
-    <label>Level</label>
-    <select id="qLevel">
-      <option value="basic">basic</option>
-      <option value="standard">standard</option>
-    </select>
-    <label>Subject group</label>
-    <select id="qSubject">
-      <option value="1a">1A</option>
-      <option value="2b">2B</option>
-      <option value="3">3</option>
-    </select>
-    <label>Category</label>
-    <input id="qCat" placeholder="algebra">
-    <label>Question (LaTeX $...$)</label>
-    <textarea id="qText"></textarea>
-    <label>Explanation (LaTeX $...$)</label>
-    <textarea id="qExp"></textarea>
-    <label>Answer (number)</label>
-    <input id="qAns" type="number" inputmode="numeric">
-    <div class="editor-btns">
-      <button class="btn" onclick="saveQ()">Save</button>
-      <button class="btn" onclick="closeEditor()" style="color:var(--faint)">Cancel</button>
+<div class="shell" id="shell" hidden>
+  <!-- ── Sidebar ── -->
+  <div class="sidebar">
+    <div class="sb-top">
+      <select class="sb-select" id="sbSubj" onchange="applyFilter()">
+        <option value="">all subj</option>
+        <option value="1A">1A</option>
+        <option value="2B">2B</option>
+        <option value="3">3</option>
+      </select>
+      <select class="sb-select" id="sbMode" onchange="applyFilter()">
+        <option value="">all mode</option>
+        <option value="standard">standard</option>
+        <option value="basic">basic</option>
+      </select>
     </div>
+    <div class="sb-tree" id="sbTree"></div>
+    <div class="sb-bot">
+      <button class="btn btn-sm" onclick="toggleNsForm()">+ New Set</button>
+      <div class="ns-form" id="nsForm" hidden>
+        <div class="pf-lbl" style="margin-top:10px">ID</div>
+        <input class="ns-in" id="nsId" placeholder="m031">
+        <div class="pf-lbl">Title</div>
+        <input class="ns-in" id="nsTitle" placeholder="3次関数の極値">
+        <div class="ns-row">
+          <div>
+            <div class="pf-lbl">Subject</div>
+            <select class="ns-sel" id="nsSubj">
+              <option value="1A">1A</option>
+              <option value="2B">2B</option>
+              <option value="3" selected>3</option>
+            </select>
+          </div>
+          <div>
+            <div class="pf-lbl">Mode</div>
+            <select class="ns-sel" id="nsMode">
+              <option value="standard" selected>standard</option>
+              <option value="basic">basic</option>
+            </select>
+          </div>
+        </div>
+        <div class="pf-btns" style="margin-top:6px">
+          <button class="btn btn-sm" onclick="createSet()">Create</button>
+          <button class="btn btn-sm btn-ghost" onclick="toggleNsForm()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Main Panel ── -->
+  <div class="main" id="mainPanel">
+    <div class="mp-empty" id="mpEmpty">← select a set</div>
+    <div class="sp" id="setPanel" hidden></div>
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 <script src="/admin.js"></script>
 <script>
-  const html = document.documentElement;
-  const saved = localStorage.getItem('mathbarker-theme');
-  if (saved === 'dark' || (!saved && matchMedia('(prefers-color-scheme: dark)').matches)) {
-    html.classList.add('dark');
-  }
-  document.getElementById('themeToggle').addEventListener('click', () => {
-    html.classList.toggle('dark');
-    localStorage.setItem('mathbarker-theme', html.classList.contains('dark') ? 'dark' : 'light');
+(function(){
+  var h=document.documentElement;
+  var s=localStorage.getItem('mathbarker-theme');
+  if(s==='dark'||(!s&&matchMedia('(prefers-color-scheme:dark)').matches))h.classList.add('dark');
+  document.getElementById('themeToggle').addEventListener('click',function(){
+    h.classList.toggle('dark');
+    localStorage.setItem('mathbarker-theme',h.classList.contains('dark')?'dark':'light');
   });
+  document.getElementById('adminPw').addEventListener('keydown',function(e){if(e.key==='Enter')login();});
+  document.getElementById('loginBtn').addEventListener('click',login);
+})();
 </script>
 </body>
 </html>
