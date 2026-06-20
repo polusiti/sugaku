@@ -38,6 +38,37 @@ export default {
       return handleAdminLogin(request, env);
     }
 
+    /* ── problems CRUD ── */
+    if (url.pathname === '/api/problems' && request.method === 'GET') {
+      return handleListProblems(request, env);
+    }
+    if (url.pathname === '/api/problems' && request.method === 'POST') {
+      return handleCreateProblem(request, env);
+    }
+    {
+      const m = url.pathname.match(/^\/api\/problems\/([^/]+)$/);
+      if (m) {
+        if (request.method === 'PUT')    return handleUpdateProblem(request, env, m[1]);
+        if (request.method === 'DELETE') return handleDeleteProblem(request, env, m[1]);
+      }
+    }
+
+    /* ── sets CRUD ── */
+    if (url.pathname === '/api/sets' && request.method === 'GET') {
+      return handleListSets(request, env);
+    }
+    if (url.pathname === '/api/sets' && request.method === 'POST') {
+      return handleCreateSet(request, env);
+    }
+    {
+      const m = url.pathname.match(/^\/api\/sets\/([^/]+)$/);
+      if (m) {
+        if (request.method === 'GET')    return handleGetSet(request, env, m[1]);
+        if (request.method === 'PUT')    return handleUpdateSet(request, env, m[1]);
+        if (request.method === 'DELETE') return handleDeleteSet(request, env, m[1]);
+      }
+    }
+
     /* ── page routing ── */
     const p = url.pathname.toLowerCase();
     if (p.startsWith('/level/')) {
@@ -51,6 +82,9 @@ export default {
     }
     if (p === '/admin') {
       return env.ASSETS.fetch(new URL('/admin.html', request.url).toString());
+    }
+    if (p === '/jikken' || p.startsWith('/jikken/')) {
+      return env.ASSETS.fetch(new URL('/jikken.html', request.url).toString());
     }
 
     /* ── assets ── */
@@ -286,6 +320,148 @@ async function handleAdminLogin(request, env) {
   } catch (e) {
     return json({ error: e.message }, 400);
   }
+}
+
+/* ═══════════════════════════════════════════
+   Problems
+   ═══════════════════════════════════════════ */
+
+async function handleListProblems(request, env) {
+  const h = corsHeaders();
+  const url = new URL(request.url);
+  const subject = url.searchParams.get('subject') || '';
+  const mode    = url.searchParams.get('mode') || '';
+  const status  = url.searchParams.get('status') || '';
+  const topic   = url.searchParams.get('topic') || '';
+
+  const conds = [], binds = [];
+  if (subject) { conds.push('subject=?'); binds.push(subject); }
+  if (mode)    { conds.push('mode=?');    binds.push(mode); }
+  if (status)  { conds.push('status=?');  binds.push(status); }
+  if (topic)   { conds.push('topic LIKE ?'); binds.push('%' + topic + '%'); }
+
+  const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
+  const { results } = await env.MATHBARKER_DB.prepare(
+    `SELECT id, subject, mode, topic, status, type, q, ans as answer, explanation, created_at FROM problems ${where} ORDER BY created_at DESC, id`
+  ).bind(...binds).all();
+  return json(results, 200, h);
+}
+
+async function handleCreateProblem(request, env) {
+  const h = corsHeaders();
+  try {
+    const { id, subject, mode, topic, status, type, q, ans, explanation } = await request.json();
+    if (!id || !q || ans === undefined) return json({ error: 'id, q, ans required' }, 400, h);
+    await env.MATHBARKER_DB.prepare(
+      'INSERT INTO problems (id,subject,mode,topic,status,type,q,ans,explanation,created_at) VALUES (?,?,?,?,?,?,?,?,?,date(\'now\'))'
+    ).bind(id, subject||'1A', mode||'standard', topic||'', status||'draft', type||'calc', q, ans, explanation||'').run();
+    return json({ ok: true, id }, 200, h);
+  } catch (e) {
+    return json({ error: e.message }, 500, h);
+  }
+}
+
+async function handleUpdateProblem(request, env, id) {
+  const h = corsHeaders();
+  try {
+    const body = await request.json();
+    const sets = [], vals = [];
+    for (const k of ['subject','mode','topic','status','type','q','ans','explanation']) {
+      if (body[k] !== undefined) { sets.push(k+'=?'); vals.push(body[k]); }
+    }
+    if (!sets.length) return json({ error: 'no fields' }, 400, h);
+    vals.push(id);
+    await env.MATHBARKER_DB.prepare(`UPDATE problems SET ${sets.join(',')} WHERE id=?`).bind(...vals).run();
+    return json({ ok: true }, 200, h);
+  } catch (e) {
+    return json({ error: e.message }, 500, h);
+  }
+}
+
+async function handleDeleteProblem(request, env, id) {
+  const h = corsHeaders();
+  await env.MATHBARKER_DB.prepare('DELETE FROM problems WHERE id=?').bind(id).run();
+  return json({ ok: true }, 200, h);
+}
+
+/* ═══════════════════════════════════════════
+   Sets
+   ═══════════════════════════════════════════ */
+
+async function handleListSets(request, env) {
+  const h = corsHeaders();
+  const url = new URL(request.url);
+  const subject = url.searchParams.get('subject') || '';
+  const mode    = url.searchParams.get('mode') || '';
+
+  const conds = [], binds = [];
+  if (subject) { conds.push('subject=?'); binds.push(subject); }
+  if (mode)    { conds.push('mode=?');    binds.push(mode); }
+  const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
+
+  const { results } = await env.MATHBARKER_DB.prepare(
+    `SELECT * FROM sets ${where} ORDER BY subject, mode, id`
+  ).bind(...binds).all();
+  return json(results, 200, h);
+}
+
+async function handleGetSet(request, env, id) {
+  const h = corsHeaders();
+  const set = await env.MATHBARKER_DB.prepare('SELECT * FROM sets WHERE id=?').bind(id).first();
+  if (!set) return json({ error: 'not found' }, 404, h);
+
+  const ids = JSON.parse(set.problem_ids || '[]');
+  let questions = [];
+  if (ids.length) {
+    const ph = ids.map(() => '?').join(',');
+    const { results } = await env.MATHBARKER_DB.prepare(
+      `SELECT id, subject, mode, topic, status, type, q, ans as answer, explanation FROM problems WHERE id IN (${ph})`
+    ).bind(...ids).all();
+    questions = ids.map(pid => results.find(p => p.id === pid)).filter(Boolean);
+  }
+  return json({ ...set, questions }, 200, h);
+}
+
+async function handleCreateSet(request, env) {
+  const h = corsHeaders();
+  try {
+    const { id, subject, mode, title, context, problem_ids } = await request.json();
+    if (!id) return json({ error: 'id required' }, 400, h);
+    const pids = JSON.stringify(Array.isArray(problem_ids) ? problem_ids : []);
+    await env.MATHBARKER_DB.prepare(
+      'INSERT INTO sets (id,subject,mode,title,context,problem_ids) VALUES (?,?,?,?,?,?)'
+    ).bind(id, subject||'1A', mode||'standard', title||'', context||'', pids).run();
+    return json({ ok: true, id }, 200, h);
+  } catch (e) {
+    return json({ error: e.message }, 500, h);
+  }
+}
+
+async function handleUpdateSet(request, env, id) {
+  const h = corsHeaders();
+  try {
+    const body = await request.json();
+    const sets = [], vals = [];
+    for (const k of ['subject','mode','title','context']) {
+      if (body[k] !== undefined) { sets.push(k+'=?'); vals.push(body[k]); }
+    }
+    if (body.problem_ids !== undefined) {
+      sets.push('problem_ids=?');
+      vals.push(JSON.stringify(Array.isArray(body.problem_ids) ? body.problem_ids : []));
+    }
+    if (!sets.length) return json({ error: 'no fields' }, 400, h);
+    vals.push(id);
+    await env.MATHBARKER_DB.prepare(`UPDATE sets SET ${sets.join(',')} WHERE id=?`).bind(...vals).run();
+    return json({ ok: true }, 200, h);
+  } catch (e) {
+    return json({ error: e.message }, 500, h);
+  }
+}
+
+async function handleDeleteSet(request, env, id) {
+  const h = corsHeaders();
+  await env.MATHBARKER_DB.prepare('DELETE FROM sets WHERE id=?').bind(id).run();
+  return json({ ok: true }, 200, h);
 }
 
 /* ═══════════════════════════════════════════ */

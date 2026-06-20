@@ -358,6 +358,65 @@ function clearImport() {
   _importData = null;
 }
 
+/* ─── mathbarker converter (R1〜R4) ─── */
+function mathbarkerConvert(latex) {
+  var s = String(latex || '');
+  var steps = [];
+  var total = 0;
+
+  function eat(val, label) {
+    if (!isNaN(val) && val > 0) { steps.push(label + ' = ' + val); total += val; }
+  }
+
+  // R4: π を除去（係数ごと）
+  s = s.replace(/\d*\\pi(?:\^\{?\d+\}?)?/g, '');
+  // R4: Euler e（単独）を除去
+  s = s.replace(/(?<![a-zA-Z\\])e(?![a-zA-Z{])/g, '');
+  // \log_{10} の底 10 は数えない
+  s = s.replace(/\\log_\{?10\}?/g, '\\logSTD');
+
+  // R2: \frac{a}{b}（整数のみ）
+  s = s.replace(/\\frac\{(\d+)\}\{(\d+)\}/g, function(_, a, b) {
+    eat(+a + +b, '\\frac{' + a + '}{' + b + '}');
+    return ' ';
+  });
+  // R2: \sqrt[n]{a} — 非2乗根は指数も数える
+  s = s.replace(/\\sqrt\[(\d+)\]\{(\d+)\}/g, function(_, n, a) {
+    eat(+n + +a, '\\sqrt[' + n + ']{' + a + '}');
+    return ' ';
+  });
+  // R2: \sqrt{a} — 平方根は中身のみ
+  s = s.replace(/\\sqrt\{(\d+)\}/g, function(_, a) {
+    eat(+a, '\\sqrt{' + a + '}');
+    return ' ';
+  });
+  // R2: \log_{b}{a} or \log_b a（非標準底）
+  s = s.replace(/\\log_\{(\d+)\}\{?(\d+)\}?/g, function(_, b, a) {
+    eat(+b + +a, '\\log_{' + b + '} ' + a);
+    return ' ';
+  });
+  s = s.replace(/\\log_(\d+)\s+(\d+)/g, function(_, b, a) {
+    eat(+b + +a, '\\log_' + b + ' ' + a);
+    return ' ';
+  });
+  // R2: \logSTD a or \log a（標準底、底は数えない）
+  s = s.replace(/\\(?:log|logSTD)\s*\{?(\d+)\}?/g, function(_, a) {
+    eat(+a, '\\log ' + a);
+    return ' ';
+  });
+
+  // R3: マイナス・特殊記号を除去
+  s = s.replace(/[-+×÷=<>≤≥(){}[\]\\^_]/g, ' ');
+  s = s.replace(/[a-zA-Z]/g, ' ');
+
+  // 残った整数
+  var nums = s.match(/\b\d+\b/g) || [];
+  nums.forEach(function(n) { eat(+n, n); });
+
+  return { total: total, steps: steps };
+}
+
+/* ─── LaTeX parser ─── */
 function parseMondaiLatex(raw) {
   var result = { error: null, set: { id: '', subject: '', mode: '', title: '' }, context: '', problems: [] };
 
@@ -365,7 +424,9 @@ function parseMondaiLatex(raw) {
   var hm = raw.match(/\\begin\{mondai\}\[([^\]]+)\]/);
   if (!hm) { result.error = '\\begin{mondai}[...] が見つかりません'; return result; }
   var hp = hm[1].split(/[、,，]/);
-  result.set.subject = (hp[0] || '').trim();
+  var subjectRaw = (hp[0] || '').trim();
+  result.set.subject = subjectRaw.replace(/\$?\\clubsuit\$?\s*/g, '').trim();
+  result.set.isProof = /\\clubsuit/.test(subjectRaw);
   var modeStr = (hp[1] || '').trim().toUpperCase();
   result.set.mode  = (modeStr === 'BASIC') ? 'basic' : 'standard';
   result.set.title = (hp[2] || '').trim();
@@ -374,7 +435,7 @@ function parseMondaiLatex(raw) {
   var mm = raw.match(/\\begin\{mondai\}\[[^\]]*\]([\s\S]*?)\\end\{mondai\}/);
   if (!mm) { result.error = '\\end{mondai} が見つかりません'; return result; }
   var body = mm[1]
-    .replace(/\\begin\{tikzpicture\}[\s\S]*?\\end\{tikzpicture\}/g, '[図]')
+    .replace(/\\begin\{tikzpicture\}[\s\S]*?\\end\{tikzpicture\}/g, '[図 — TikZ省略]')
     .replace(/\\begin\{center\}[\s\S]*?\\end\{center\}/g, '')
     .trim();
 
@@ -382,70 +443,88 @@ function parseMondaiLatex(raw) {
   var am = raw.match(/\\begin\{answer\}([\s\S]*?)\\end\{answer\}/);
   var ansBody = am ? am[1] : '';
 
-  // $\star$ values (順番に取り出す)
-  var stars = [];
-  var starRe = /\$\\star\$\s*(\d+)/g;
-  var sm;
-  while ((sm = starRe.exec(ansBody)) !== null) stars.push(parseInt(sm[1], 10));
+  // answer body を小問ごとに分割 → explanation & ans expression
+  var ansSections = splitAtSubqMarkers(ansBody);
 
-  // split answer body at (N) markers → explanations
-  var ansExps = splitAtSubqMarkers(ansBody).map(function(s) {
-    return s.replace(/\$\\star\$\s*\d+/g, '').trim();
-  });
-
-  // split mondai body into context + sub-questions
-  var firstSubRe = /(?:^|\n)[ \t]*\(1\)/;
-  var firstMatch = body.match(firstSubRe);
-
+  // mondai body を context + 小問に分割
+  var firstMatch = body.match(/(?:^|\n)[ \t]*\(1\)/);
+  var subqParts;
   if (!firstMatch) {
-    // 設問なし → 丸ごと context、problem は1つ（空q）
     result.context = body;
-    result.problems = [{ id: '', q: '', ans: stars[0] !== undefined ? stars[0] : '', explanation: ansExps[0] || '' }];
+    subqParts = [''];
   } else {
     var splitIdx = body.indexOf(firstMatch[0]);
     if (firstMatch[0][0] === '\n') splitIdx++;
     result.context = body.substring(0, splitIdx).trim();
-
-    var subqParts = splitAtSubqMarkers(body.substring(splitIdx));
-    result.problems = subqParts.map(function(part, i) {
-      return {
-        id: '',
-        q: part.trim(),
-        ans: stars[i] !== undefined ? stars[i] : '',
-        explanation: ansExps[i] || ''
-      };
-    });
+    subqParts = splitAtSubqMarkers(body.substring(splitIdx));
   }
 
   // auto-suggest IDs
   var nextNum = 1;
   _allProblems.forEach(function(p) {
-    var m = (p.id || '').match(/^p(\d+)$/);
-    if (m) nextNum = Math.max(nextNum, parseInt(m[1], 10) + 1);
+    var m2 = (p.id || '').match(/^p(\d+)$/);
+    if (m2) nextNum = Math.max(nextNum, parseInt(m2[1], 10) + 1);
   });
-  result.problems.forEach(function(p, i) {
-    p.id = 'p' + String(nextNum + i).padStart(3, '0');
+
+  result.problems = subqParts.map(function(part, i) {
+    // [calc] / [proof] タグを検出
+    var typeTag = (part.match(/^\s*\[(calc|proof)\]\s*/i) || [])[1];
+    var type = typeTag ? typeTag.toLowerCase() : (result.set.isProof ? 'proof' : 'calc');
+    var q = part.replace(/^\s*\[(calc|proof)\]\s*/i, '').trim();
+
+    // answer section から explanation と答えの式を抽出
+    var ansSection = ansSections[i] || '';
+    // 答えの式: answer section 内の最後の $...$ ブロック
+    var exprMatch = ansSection.match(/\$([^$]+)\$(?![\s\S]*\$[^$]+\$)/);
+    var ansExpr = '';
+    if (exprMatch) {
+      var candidate = exprMatch[1];
+      // = を含む場合は = 以降を取る
+      var eqIdx = candidate.lastIndexOf('=');
+      ansExpr = (eqIdx >= 0 ? candidate.substring(eqIdx + 1) : candidate).trim();
+    }
+    // explanation: $\star$ N を除去した全文
+    var explanation = ansSection.replace(/\$\\star\$\s*\d+/g, '').trim();
+
+    return {
+      id: 'p' + String(nextNum + i).padStart(3, '0'),
+      type: type,
+      q: q,
+      ansExpr: ansExpr,
+      ans: '',           // converter で確定する
+      explanation: explanation
+    };
   });
 
   return result;
 }
 
 function splitAtSubqMarkers(text) {
-  // split at (1), (2), ... markers
-  var parts = text.split(/(?=(?:^|\n)[ \t]*\(\d+\))/m);
+  var parts = text.split(/(?=(?:^|\n)[ \t]*\(\d+(?:-\d+)?\))/m);
   return parts.map(function(s) { return s.trim(); }).filter(Boolean);
+}
+
+/* ─── converter UI ─── */
+function updateConverter(i) {
+  var exprEl = document.getElementById('ipExpr-' + i);
+  var ansEl  = document.getElementById('ipProbAns-' + i);
+  var nEl    = document.getElementById('ipConvN-' + i);
+  var stEl   = document.getElementById('ipConvSt-' + i);
+  if (!exprEl) return;
+  var r = mathbarkerConvert(exprEl.value);
+  if (nEl)  nEl.textContent  = r.total > 0 ? r.total : '?';
+  if (stEl) stEl.textContent = r.steps.length ? r.steps.join('  +  ') : '(数値が見つかりません)';
+  if (ansEl && r.total > 0) ansEl.value = r.total;
 }
 
 function parseAndPreview() {
   var raw = (document.getElementById('ipJson').value || '').trim();
   var errEl = document.getElementById('ipErr');
   errEl.hidden = true;
-
   if (!raw) { errEl.textContent = 'LaTeX を貼り付けてください'; errEl.hidden = false; return; }
 
   var data = parseMondaiLatex(raw);
   if (data.error) { errEl.textContent = data.error; errEl.hidden = false; return; }
-
   _importData = data;
 
   document.getElementById('ipSetId').value = data.set.id;
@@ -460,39 +539,91 @@ function parseAndPreview() {
 }
 
 function renderImportProblems(probs) {
-  var html = '';
+  var calcCount = probs.filter(function(p) { return p.type !== 'proof'; }).length;
+  var proofCount = probs.length - calcCount;
+
+  var html = '<div style="font-size:0.72rem;color:var(--faint);margin-bottom:12px">'
+    + '計 ' + probs.length + ' 設問 — '
+    + '<span style="color:#2a7a2a">calc: ' + calcCount + '</span>'
+    + (proofCount ? ' &nbsp;／&nbsp; <span style="color:#888">proof: ' + proofCount + '（DBに追加しない）</span>' : '')
+    + '</div>';
+
   probs.forEach(function(p, i) {
-    html += '<div class="ip-prob">'
+    var isProof = p.type === 'proof';
+    html += '<div class="ip-prob' + (isProof ? ' ip-prob-proof' : '') + '">'
+      // ── header row
       + '<div class="ip-prob-hd">'
-      +   '<span class="prob-n" style="margin-right:6px">(' + (i+1) + ')</span>'
-      +   '<div style="flex:0 0 auto"><div class="pf-lbl">ID</div>'
-      +     '<input class="pf-in" id="ipProbId-' + i + '" value="' + esc(p.id || '') + '" style="width:90px"></div>'
-      +   '<div style="flex:0 0 auto;margin-left:10px"><div class="pf-lbl">ans</div>'
-      +     '<input class="pf-in" id="ipProbAns-' + i + '" type="number" value="' + (p.ans !== undefined ? p.ans : '') + '" style="width:70px"></div>'
-      +   '<div style="flex:0 0 auto;margin-left:10px"><div class="pf-lbl">status</div>'
-      +     '<select class="pf-sel" id="ipProbStatus-' + i + '" style="width:80px">'
-      +       opt2('draft', p.status || 'draft') + opt2('live', p.status || 'draft') + opt2('broken', p.status || 'draft')
+      +   '<span class="ip-badge ip-badge-' + (isProof ? 'proof' : 'calc') + '">' + (isProof ? 'proof' : 'calc') + '</span>'
+      +   '<span class="prob-n" style="margin-right:8px">(' + (i+1) + ')</span>'
+      +   '<div class="pf-split" style="flex:1;margin:0">'
+      +     '<div id="ipProbQPv-' + i + '" class="pf-pv" style="min-height:0;border:none;padding:0;font-size:0.85rem"></div>'
+      +   '</div>'
+      + '</div>';
+
+    if (isProof) {
+      html += '<div class="ip-skip-note">証明・図示問題 — Import 対象外。q テキストと解説は参考として保持。</div>';
+    } else {
+      // ── Step B: converter
+      html += '<div class="ip-conv">'
+        +   '<div class="ip-conv-expr">'
+        +     '<div class="pf-lbl">答えの式（LaTeX）— R1〜R3 変換後の整数を自動計算</div>'
+        +     '<input class="pf-in" id="ipExpr-' + i + '" value="' + esc(p.ansExpr || '') + '" '
+        +       'oninput="updateConverter(' + i + ')" placeholder="例: \\frac{\\sqrt{3}+1}{2}">'
+        +     '<div class="ip-conv-steps" id="ipConvSt-' + i + '"></div>'
+        +   '</div>'
+        +   '<div class="ip-conv-result" id="ipConvRes-' + i + '">'
+        +     '<span class="ip-conv-star">★</span>'
+        +     '<span class="ip-conv-n" id="ipConvN-' + i + '">?</span>'
+        +   '</div>'
+        + '</div>';
+    }
+
+    // ── metadata row
+    html += '<div class="pf-row pf-r3" style="margin-top:10px">'
+      +   '<div><div class="pf-lbl">ID</div>'
+      +     '<input class="pf-in" id="ipProbId-' + i + '" value="' + esc(p.id || '') + '"' + (isProof ? ' disabled' : '') + '></div>'
+      +   '<div><div class="pf-lbl">ans</div>'
+      +     '<input class="pf-in" id="ipProbAns-' + i + '" type="number" value="' + (p.ans || '') + '"'
+      +       (isProof ? ' disabled' : '') + '></div>'
+      +   '<div><div class="pf-lbl">status</div>'
+      +     '<select class="pf-sel" id="ipProbStatus-' + i + '"' + (isProof ? ' disabled' : '') + '>'
+      +       opt2('draft', 'draft') + opt2('live', 'draft') + opt2('broken', 'draft')
       +     '</select></div>'
-      + '</div>'
-      + '<div class="pf-lbl" style="margin-top:10px">q (LaTeX)</div>'
+      + '</div>';
+
+    // ── q textarea
+    html += '<div class="pf-lbl" style="margin-top:10px">q (LaTeX)</div>'
       + '<div class="pf-split">'
       +   '<textarea class="pf-ta" id="ipProbQ-' + i + '" oninput="debPreview(\'ipProbQ-' + i + '\',\'ipProbQPv-' + i + '\')">'
       +     esc(p.q || '') + '</textarea>'
-      +   '<div class="pf-pv" id="ipProbQPv-' + i + '"></div>'
-      + '</div>'
-      + '<div class="pf-lbl" style="margin-top:8px">explanation</div>'
+      +   '<div class="pf-pv" id="ipProbQPv2-' + i + '"></div>'
+      + '</div>';
+
+    // ── explanation textarea
+    html += '<div class="pf-lbl" style="margin-top:8px">explanation</div>'
       + '<div class="pf-split">'
       +   '<textarea class="pf-ta" id="ipProbExp-' + i + '" oninput="debPreview(\'ipProbExp-' + i + '\',\'ipProbExpPv-' + i + '\')">'
       +     esc(p.explanation || '') + '</textarea>'
       +   '<div class="pf-pv" id="ipProbExpPv-' + i + '"></div>'
-      + '</div>'
       + '</div>';
+
+    html += '</div>'; // .ip-prob
   });
+
   document.getElementById('ipProblems').innerHTML = html;
-  probs.forEach(function(_, i) {
+
+  probs.forEach(function(p, i) {
     setTimeout(function() {
-      debPreview('ipProbQ-' + i, 'ipProbQPv-' + i);
+      // q preview in header
+      var qEl = document.getElementById('ipProbQ-' + i);
+      var pvEl = document.getElementById('ipProbQPv-' + i);
+      if (qEl && pvEl) {
+        pvEl.textContent = (p.q || '').substring(0, 80) + ((p.q || '').length > 80 ? '…' : '');
+        renderMathInElement && renderMathInElement(pvEl, { delimiters: [{left:'$',right:'$',display:false},{left:'\\(',right:'\\)',display:false}], throwOnError: false });
+      }
+      debPreview('ipProbQ-' + i, 'ipProbQPv2-' + i);
       debPreview('ipProbExp-' + i, 'ipProbExpPv-' + i);
+      if (p.type !== 'proof') updateConverter(i);
     }, 0);
   });
 }
@@ -507,16 +638,25 @@ async function executeImport() {
   var context = (document.getElementById('ipCtxTa').value || '').trim();
   if (!setId) { alert('set id が必要です'); return; }
 
+  // calc 問題のみ import（proof はスキップ）
   var probIds = [];
   var n = _importData.problems.length;
   for (var i = 0; i < n; i++) {
+    var prob = _importData.problems[i];
+    if (prob.type === 'proof') continue;
+
     var pid    = (document.getElementById('ipProbId-' + i).value || '').trim();
     var ans    = parseInt(document.getElementById('ipProbAns-' + i).value, 10);
     var status = document.getElementById('ipProbStatus-' + i).value;
     var q      = (document.getElementById('ipProbQ-' + i).value || '').trim();
     var exp    = (document.getElementById('ipProbExp-' + i).value || '').trim();
-    if (!pid || isNaN(ans)) { alert('problem ' + (i+1) + ': id と ans が必要です'); return; }
-    var ok = await api('POST', '/api/problems', {id: pid, subject, mode, topic: title, status, q, ans, explanation: exp});
+
+    if (!pid)     { alert('(' + (i+1) + ') の ID を入力してください'); return; }
+    if (isNaN(ans)) { alert('(' + (i+1) + ') の ★ 値（ans）を入力してください\n答えの式を入力してConverterで計算してください'); return; }
+
+    var ok = await api('POST', '/api/problems', {
+      id: pid, subject, mode, topic: title, status, type: 'calc', q, ans, explanation: exp
+    });
     if (!ok) { alert('problem ' + pid + ' の作成に失敗しました'); return; }
     probIds.push(pid);
   }

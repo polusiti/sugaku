@@ -145,6 +145,34 @@
 
     .s-live{color:#2a7a2a}.s-broken{color:#a02020}.s-draft{color:#888}
 
+    /* step labels */
+    .ip-step-lbl{font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;
+      font-weight:700;color:var(--faint);margin-top:26px;margin-bottom:10px;
+      display:flex;align-items:center;gap:8px}
+    .ip-step-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
+
+    /* calc / proof badges */
+    .ip-badge{display:inline-block;font-size:0.6rem;font-weight:700;
+      letter-spacing:0.06em;padding:1px 6px;border-radius:2px;margin-right:6px;flex-shrink:0}
+    .ip-badge-calc{color:#2a7a2a;border:1px solid #2a7a2a;background:rgba(42,122,42,0.04)}
+    .ip-badge-proof{color:#888;border:1px solid #aaa;background:rgba(0,0,0,0.02)}
+
+    /* converter */
+    .ip-conv{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start;margin-top:8px}
+    .ip-conv-expr{display:flex;flex-direction:column;gap:4px}
+    .ip-conv-result{display:flex;flex-direction:column;align-items:center;
+      justify-content:center;min-width:80px;padding:8px 12px;
+      border:1px solid var(--border);font-size:1.05rem;font-weight:700;
+      font-family:Georgia,serif;color:var(--ink);white-space:nowrap}
+    .ip-conv-star{font-size:0.65rem;color:var(--faint);margin-bottom:2px}
+    .ip-conv-n{font-size:1.4rem;font-weight:700}
+    .ip-conv-steps{font-size:0.65rem;color:var(--faint);margin-top:4px;line-height:1.6;
+      font-family:monospace;grid-column:1/-1}
+    .ip-skip-note{font-size:0.72rem;color:var(--faint);padding:8px 10px;
+      background:var(--hover);border:1px dashed var(--border);margin-top:8px}
+    .ip-prob-proof{opacity:0.55}
+    .ip-prob+.ip-prob{margin-top:12px}
+
     /* import panel */
     .ip{padding:22px 28px 40px}
     .ip-hd{display:flex;align-items:center;gap:14px;margin-bottom:18px}
