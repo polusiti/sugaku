@@ -358,39 +358,105 @@ function clearImport() {
   _importData = null;
 }
 
+function parseMondaiLatex(raw) {
+  var result = { error: null, set: { id: '', subject: '', mode: '', title: '' }, context: '', problems: [] };
+
+  // header: \begin{mondai}[subject、mode、title]
+  var hm = raw.match(/\\begin\{mondai\}\[([^\]]+)\]/);
+  if (!hm) { result.error = '\\begin{mondai}[...] が見つかりません'; return result; }
+  var hp = hm[1].split(/[、,，]/);
+  result.set.subject = (hp[0] || '').trim();
+  var modeStr = (hp[1] || '').trim().toUpperCase();
+  result.set.mode  = (modeStr === 'BASIC') ? 'basic' : 'standard';
+  result.set.title = (hp[2] || '').trim();
+
+  // mondai body
+  var mm = raw.match(/\\begin\{mondai\}\[[^\]]*\]([\s\S]*?)\\end\{mondai\}/);
+  if (!mm) { result.error = '\\end{mondai} が見つかりません'; return result; }
+  var body = mm[1]
+    .replace(/\\begin\{tikzpicture\}[\s\S]*?\\end\{tikzpicture\}/g, '[図]')
+    .replace(/\\begin\{center\}[\s\S]*?\\end\{center\}/g, '')
+    .trim();
+
+  // answer body
+  var am = raw.match(/\\begin\{answer\}([\s\S]*?)\\end\{answer\}/);
+  var ansBody = am ? am[1] : '';
+
+  // $\star$ values (順番に取り出す)
+  var stars = [];
+  var starRe = /\$\\star\$\s*(\d+)/g;
+  var sm;
+  while ((sm = starRe.exec(ansBody)) !== null) stars.push(parseInt(sm[1], 10));
+
+  // split answer body at (N) markers → explanations
+  var ansExps = splitAtSubqMarkers(ansBody).map(function(s) {
+    return s.replace(/\$\\star\$\s*\d+/g, '').trim();
+  });
+
+  // split mondai body into context + sub-questions
+  var firstSubRe = /(?:^|\n)[ \t]*\(1\)/;
+  var firstMatch = body.match(firstSubRe);
+
+  if (!firstMatch) {
+    // 設問なし → 丸ごと context、problem は1つ（空q）
+    result.context = body;
+    result.problems = [{ id: '', q: '', ans: stars[0] !== undefined ? stars[0] : '', explanation: ansExps[0] || '' }];
+  } else {
+    var splitIdx = body.indexOf(firstMatch[0]);
+    if (firstMatch[0][0] === '\n') splitIdx++;
+    result.context = body.substring(0, splitIdx).trim();
+
+    var subqParts = splitAtSubqMarkers(body.substring(splitIdx));
+    result.problems = subqParts.map(function(part, i) {
+      return {
+        id: '',
+        q: part.trim(),
+        ans: stars[i] !== undefined ? stars[i] : '',
+        explanation: ansExps[i] || ''
+      };
+    });
+  }
+
+  // auto-suggest IDs
+  var nextNum = 1;
+  _allProblems.forEach(function(p) {
+    var m = (p.id || '').match(/^p(\d+)$/);
+    if (m) nextNum = Math.max(nextNum, parseInt(m[1], 10) + 1);
+  });
+  result.problems.forEach(function(p, i) {
+    p.id = 'p' + String(nextNum + i).padStart(3, '0');
+  });
+
+  return result;
+}
+
+function splitAtSubqMarkers(text) {
+  // split at (1), (2), ... markers
+  var parts = text.split(/(?=(?:^|\n)[ \t]*\(\d+\))/m);
+  return parts.map(function(s) { return s.trim(); }).filter(Boolean);
+}
+
 function parseAndPreview() {
   var raw = (document.getElementById('ipJson').value || '').trim();
   var errEl = document.getElementById('ipErr');
   errEl.hidden = true;
 
-  var data;
-  try { data = JSON.parse(raw); } catch(e) {
-    errEl.textContent = 'JSON parse error: ' + e.message;
-    errEl.hidden = false;
-    return;
-  }
+  if (!raw) { errEl.textContent = 'LaTeX を貼り付けてください'; errEl.hidden = false; return; }
 
-  if (!data.set || !data.set.id) { showErr('set.id が必要です'); return; }
-  if (!Array.isArray(data.problems) || !data.problems.length) { showErr('problems 配列が必要です'); return; }
-  for (var i = 0; i < data.problems.length; i++) {
-    var p = data.problems[i];
-    if (!p.id)            { showErr('problems[' + i + '].id が必要です'); return; }
-    if (p.ans === undefined) { showErr('problems[' + i + '].ans が必要です'); return; }
-  }
+  var data = parseMondaiLatex(raw);
+  if (data.error) { errEl.textContent = data.error; errEl.hidden = false; return; }
 
   _importData = data;
 
-  document.getElementById('ipSetId').value  = data.set.id || '';
-  document.getElementById('ipSubj').value   = data.set.subject || '1A';
-  document.getElementById('ipMode').value   = data.set.mode || 'standard';
-  document.getElementById('ipTitle').value  = data.set.title || '';
-  document.getElementById('ipCtxTa').value  = data.context || '';
+  document.getElementById('ipSetId').value = data.set.id;
+  document.getElementById('ipSubj').value  = data.set.subject || '1A';
+  document.getElementById('ipMode').value  = data.set.mode || 'standard';
+  document.getElementById('ipTitle').value = data.set.title;
+  document.getElementById('ipCtxTa').value = data.context;
 
   renderImportProblems(data.problems);
   document.getElementById('ipPreview').hidden = false;
   debPreview('ipCtxTa', 'ipCtxPv');
-
-  function showErr(msg) { errEl.textContent = msg; errEl.hidden = false; }
 }
 
 function renderImportProblems(probs) {

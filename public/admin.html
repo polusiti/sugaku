@@ -250,18 +250,21 @@
         <button class="btn btn-sm btn-ghost" onclick="cancelImport()">← Back</button>
       </div>
 
-      <div class="sec-hd">schema</div>
-      <div class="ip-schema">{
-  "set": { "id": "m031", "subject": "3", "mode": "standard", "title": "..." },
-  "context": "LaTeX — 大問共通の問題文",
-  "problems": [
-    { "id": "p058", "q": "(1) ...", "ans": 10, "explanation": "..." },
-    { "id": "p059", "q": "(2) ...", "ans": 6,  "explanation": "..." }
-  ]
-}</div>
+      <div class="sec-hd">format</div>
+      <div class="ip-schema">\begin{mondai}[1A、STANDARD、テーマ名]
+問題文（大問）。以下の問いに答えよ。
 
-      <div class="sec-hd" style="margin-top:20px">paste JSON</div>
-      <textarea class="ip-ta" id="ipJson" placeholder="上のschemaに従ったJSONを貼り付ける"></textarea>
+(1) 小問1のテキスト。
+(2) 小問2のテキスト。
+\end{mondai}
+
+\begin{answer}
+(1) 解答... $\star$ 10
+(2) 解答... $\star$ 6
+\end{answer}</div>
+
+      <div class="sec-hd" style="margin-top:20px">paste LaTeX</div>
+      <textarea class="ip-ta" id="ipJson" placeholder="Geminiが出力した \begin{mondai}...\end{answer} をそのまま貼り付ける"></textarea>
       <div class="pf-btns" style="margin-top:8px">
         <button class="btn btn-sm" onclick="parseAndPreview()">Parse &amp; Preview</button>
         <button class="btn btn-sm btn-ghost" onclick="clearImport()">Clear</button>
