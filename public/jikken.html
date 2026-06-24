@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mathbarker — jikken</title>
+  <link rel="icon" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#faf7f0;--ink:#2a2a2a;--faint:#aaa;
+      --border:rgba(0,0,0,0.07);--dash:rgba(0,0,0,0.13);--line:rgba(0,0,0,0.05);
+      --correct:#2a6e2a;--wrong:#8a2a2a;--ctx-bg:rgba(0,0,0,0.015);
+    }
+    :root.dark{
+      --bg:#0d0d0d;--ink:#d8d8d8;--faint:#4a4a4a;
+      --border:rgba(255,255,255,0.06);--dash:rgba(255,255,255,0.1);--line:rgba(255,255,255,0.04);
+      --correct:#5cba5c;--wrong:#c85a5a;--ctx-bg:rgba(255,255,255,0.025);
+    }
+    body{background:var(--bg);font-family:'Caveat',cursive;color:var(--ink);min-height:100vh;display:flex;flex-direction:column;align-items:center;transition:background 0.4s,color 0.4s}
+    .wrap{width:100%;max-width:560px;padding:32px 22px 80px}
+
+    .hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px}
+    .back{color:var(--faint);text-decoration:none;font-size:0.85rem;transition:color 0.2s}.back:hover{color:var(--ink)}
+    .hd-r{display:flex;align-items:center;gap:12px}
+    .badge{font-size:0.6rem;font-weight:700;letter-spacing:0.16em;color:var(--faint)}
+    .tgl{background:var(--bg);border:1px solid var(--border);border-radius:20px;width:34px;height:20px;cursor:pointer;position:relative}
+    .tgl::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--ink);transition:transform 0.3s}
+    :root.dark .tgl::after{transform:translateX(14px)}
+
+    /* progress */
+    .prog{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+    .prog-dots{display:flex;gap:5px;flex:1}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--border);transition:background 0.3s,transform 0.3s}
+    .dot.cur{background:var(--ink);transform:scale(1.25)}
+    .dot.done-ok{background:var(--correct)}
+    .dot.done-ng{background:var(--wrong)}
+    .prog-info{font-size:0.65rem;font-weight:700;letter-spacing:0.08em;color:var(--faint);white-space:nowrap}
+
+    /* context */
+    .ctx{border:1px solid var(--border);background:var(--ctx-bg);padding:18px 20px 14px;margin-bottom:0}
+    .ctx-hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+    .ctx-meta{font-size:0.58rem;letter-spacing:0.04em;color:var(--faint)}
+    .rule-btn{background:none;border:none;padding:0;font-family:'Caveat',cursive;font-size:0.64rem;font-weight:700;letter-spacing:0.1em;color:var(--faint);cursor:pointer;transition:color 0.2s}.rule-btn:hover{color:var(--ink)}
+    .ctx-body{font-family:Georgia,'Noto Serif',serif;font-size:0.97rem;line-height:1.88;margin-top:10px}
+
+    /* questions */
+    .q-list{border-left:1px solid var(--border);border-right:1px solid var(--border);border-bottom:1px solid var(--border)}
+    .q-item{padding:22px 20px 18px;border-top:1px solid var(--line)}
+    .q-item.locked .q-body{opacity:0.12;filter:blur(2.5px);user-select:none;pointer-events:none}
+    .q-row{display:flex;gap:14px;align-items:flex-start}
+    .q-lbl{flex-shrink:0;font-size:0.78rem;font-weight:700;color:var(--faint);padding-top:4px;width:20px}
+    .q-body{flex:1;min-width:0}
+    .q-text,.ctx-body,.exp{font-family:Georgia,'Noto Serif',serif}
+    .q-text{font-size:0.97rem;line-height:1.9;margin-bottom:16px}
+    .inp-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+    .ans-in{width:82px;background:none;border:none;border-bottom:1.5px dashed var(--dash);padding:6px 4px;font-family:'Caveat',cursive;font-size:1.28rem;font-weight:600;color:var(--ink);outline:none;-webkit-appearance:none;transition:border-color 0.2s,color 0.2s}
+    .ans-in:focus{border-bottom-color:var(--faint)}
+    .ans-in.ok{border-bottom-color:var(--correct);color:var(--correct)}
+    .ans-in.ng{border-bottom-color:var(--wrong);color:var(--wrong)}
+    .sub{padding:6px 18px;background:none;border:1px solid var(--border);font-family:'Caveat',cursive;font-size:0.9rem;color:var(--ink);cursor:pointer;transition:border-color 0.2s}.sub:hover{border-color:var(--dash)}.sub:disabled{opacity:0.28}
+    .fb{font-size:0.78rem;min-height:1.1em;margin-bottom:6px}
+    .fb.ok{color:var(--correct)}.fb.ng{color:var(--wrong)}
+    .exp{padding:10px 14px;border-left:2px solid var(--dash);font-size:0.82rem;line-height:1.9;color:var(--faint);display:none;margin-top:10px}
+    .exp.show{display:block}
+
+    /* footer nav */
+    .foot{display:flex;justify-content:space-between;align-items:center;padding:14px 0;margin-top:4px}
+    .foot-score{font-size:1rem;font-weight:700;min-width:60px}
+    .foot-lbl{font-size:0.62rem;letter-spacing:0.07em;color:var(--faint);margin-left:6px}
+    .nav-row{display:flex;gap:8px}
+    .nbtn{padding:7px 16px;background:none;border:1px solid var(--border);font-family:'Caveat',cursive;font-size:0.88rem;color:var(--ink);cursor:pointer;transition:border-color 0.2s,opacity 0.2s}.nbtn:hover{border-color:var(--dash)}.nbtn:disabled{opacity:0.22;cursor:default}
+    .nbtn.go{border-color:var(--faint);font-weight:700}
+
+    .load-msg{color:var(--faint);font-size:0.85rem;padding:60px 0;text-align:center}
+    .katex-display{overflow-x:auto;overflow-y:hidden}
+    .rule-note{font-size:0.6rem;letter-spacing:0.06em;color:var(--faint);margin-bottom:22px;display:flex;align-items:center;gap:6px}
+
+    /* rule overlay */
+    .rovl{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.16s}
+    .rovl.open{opacity:1;pointer-events:auto}
+    .rpanel{background:var(--bg);border:1px solid var(--dash);padding:24px 24px 22px;width:calc(100% - 48px);max-width:360px;transition:background 0.4s,border-color 0.4s}
+    .rp-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+    .rphd{font-size:0.58rem;font-weight:700;letter-spacing:0.18em;color:var(--faint)}
+    .rclose{background:none;border:none;font-size:1.1rem;color:var(--faint);cursor:pointer;padding:0 0 0 12px;transition:color 0.2s}.rclose:hover{color:var(--ink)}
+    .rrow{display:flex;gap:14px;margin-bottom:11px;font-size:0.88rem;line-height:1.5}
+    .rk{flex-shrink:0;width:18px;font-size:0.58rem;font-weight:700;letter-spacing:0.04em;color:var(--faint);padding-top:3px}
+    .rv{color:var(--ink)}
+    .rs{font-size:0.7rem;color:var(--faint);margin-top:3px;font-family:Georgia,'Noto Serif',serif;line-height:1.6}
+    .rex{margin-top:16px;border-top:1px solid var(--border);padding-top:13px;font-size:0.76rem;line-height:2.1;color:var(--faint);font-family:Georgia,'Noto Serif',serif}
+  </style>
+</head>
+<body>
+
+<div class="rovl" id="rovl">
+  <div class="rpanel" id="rpanel">
+    <div class="rp-top"><div class="rphd">RULE</div><button class="rclose" id="rcloseBtn">&times;</button></div>
+    <div class="rrow"><span class="rk">R1</span><span class="rv">整理してから答える<div class="rs">約分・有理化・計算できるべき乗（小数禁止）</div></span></div>
+    <div class="rrow"><span class="rk">R2</span><span class="rv">式に現れる数字をすべて足す<div class="rs">省略された数は除く：$x$ の係数 $1$、$\sqrt{\phantom{x}}$ の根指数 $2$ など</div></span></div>
+    <div class="rrow"><span class="rk">R3</span><span class="rv">符号は無視する</span></div>
+    <div class="rrow"><span class="rk">R4</span><span class="rv">$\pi$・$e$ は無視する<div class="rs">係数の数字は含める</div></span></div>
+    <div class="rrow"><span class="rk">R5</span><span class="rv">文字は代入後に適用する</span></div>
+    <div class="rex">例）$e + \sqrt[3]{4} + \log_2 3 + \dfrac{\pi}{3} + 11 = 3+4+2+3+3+11 = 26$</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="hd">
+    <a class="back" href="/">← mathbarker</a>
+    <div class="hd-r">
+      <span class="badge">JIKKEN</span>
+      <button class="tgl" id="themeToggle"></button>
+    </div>
+  </header>
+
+  <div class="rule-note">※ 答えはすべて calc rule に基づいて入力 — <button class="rule-btn" onclick="_openRule()">rule ?</button></div>
+
+  <div class="prog" id="progRow" hidden>
+    <div class="prog-dots" id="progDots"></div>
+    <div class="prog-info" id="progInfo"></div>
+  </div>
+
+  <div class="load-msg" id="loadMsg">loading...</div>
+  <div id="setView" hidden></div>
+
+  <div class="foot" id="foot" hidden>
+    <div>
+      <span class="foot-score" id="footScore"></span>
+      <span class="foot-lbl" id="footLbl"></span>
+    </div>
+    <div class="nav-row">
+      <button class="nbtn" id="btnPrev" onclick="go(-1)">&larr;</button>
+      <button class="nbtn" id="btnNext" onclick="go(1)">next &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script>
+/* theme */
+(function(){
+  var h=document.documentElement,s=localStorage.getItem('mathbarker-theme');
+  if(s==='dark'||(!s&&matchMedia('(prefers-color-scheme:dark)').matches))h.classList.add('dark');
+  document.getElementById('themeToggle').addEventListener('click',function(){
+    h.classList.toggle('dark');
+    localStorage.setItem('mathbarker-theme',h.classList.contains('dark')?'dark':'light');
+  });
+})();
+
+var RK_OPTS={delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false},{left:'$',right:'$',display:false}],throwOnError:false};
+function rk(el){if(el&&window.renderMathInElement)renderMathInElement(el,RK_OPTS);}
+
+/* rule overlay */
+var _openRule;
+(function(){
+  var o=document.getElementById('rovl'),p=document.getElementById('rpanel');
+  _openRule=function(){o.classList.add('open');if(!p.dataset.r){rk(p);p.dataset.r='1';}};
+  function close(){o.classList.remove('open');}
+  document.getElementById('rcloseBtn').addEventListener('click',close);
+  o.addEventListener('click',function(e){if(e.target===o)close();});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
+})();
+
+/* ── state ── */
+var SETS=[];
+var cur=0;
+/* setStates[i] = { hist: {qi: {correct,val}}, done: false, correct: 0, total: 0 } */
+var setStates=[];
+
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+/* ── dots progress ── */
+function updateProg(){
+  var n=SETS.length;
+  document.getElementById('progRow').hidden=(n===0);
+  if(!n)return;
+  var dots='';
+  for(var i=0;i<n;i++){
+    var cls='dot';
+    if(i===cur)cls+=' cur';
+    else if(setStates[i].done){
+      var pct=setStates[i].total>0?setStates[i].correct/setStates[i].total:0;
+      cls+=pct>=0.5?' done-ok':' done-ng';
+    }
+    dots+='<span class="'+cls+'" onclick="jumpTo('+i+')"></span>';
+  }
+  document.getElementById('progDots').innerHTML=dots;
+
+  /* total score across done sets */
+  var tc=0,tt=0;
+  setStates.forEach(function(s){if(s.done){tc+=s.correct;tt+=s.total;}});
+  document.getElementById('progInfo').textContent=tt>0?(tc+'/'+tt):'';
+}
+
+function jumpTo(i){
+  cur=i;
+  renderSet(i);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ── render ── */
+function renderSet(si){
+  var set=SETS[si];
+  var st =setStates[si];
+  var qs =set.questions||[];
+
+  /* context */
+  var html='';
+  if(set.context){
+    html+='<div class="ctx">'
+      +'<div class="ctx-hd">'
+      +'<div class="ctx-meta">'+esc((set.subject||'')+(set.chapter_id?' · '+set.chapter_id:''))+'</div>'
+      +'<button class="rule-btn" onclick="_openRule()">rule</button>'
+      +'</div>'
+      +'<div class="ctx-body" id="ctx_body">'+esc(set.context)+'</div>'
+      +'</div>';
+  }
+
+  /* q list */
+  html+='<div class="q-list">';
+  qs.forEach(function(q,qi){
+    var h=st.hist[qi];
+    var locked=qi>0&&!st.hist[qi-1];
+    var okCls=h?(h.correct?' ok':' ng'):'';
+    var done=!!h;
+    html+='<div class="q-item'+(locked?' locked':'')+'" id="qi_'+qi+'">'
+      +'<div class="q-row"><span class="q-lbl">('+(qi+1)+')</span>'
+      +'<div class="q-body">'
+      +'<div class="q-text" id="qt_'+qi+'">'+esc(q.q)+'</div>'
+      +'<div class="inp-row">'
+      +'<input class="ans-in'+okCls+'" id="in_'+qi+'" type="text" inputmode="numeric" autocomplete="off" placeholder="?"'+(done?' disabled':'')+'>'
+      +'<button class="sub" id="sb_'+qi+'" onclick="submit('+si+','+qi+')"'+(done?' disabled':'')+'>'+(done?'done':'submit')+'</button>'
+      +'</div>'
+      +'<div class="fb'+(h?(h.correct?' ok':' ng'):'')+'" id="fb_'+qi+'">'+(h?(h.correct?'correct':'wrong  (ans: '+qs[qi].answer+')'):'')+'</div>'
+      +'<div class="exp'+(h?' show':'')+'" id="ex_'+qi+'">'+esc(q.explanation||'')+'</div>'
+      +'</div></div></div>';
+  });
+  html+='</div>';
+
+  document.getElementById('setView').innerHTML=html;
+  document.getElementById('setView').hidden=false;
+
+  /* footer */
+  var footEl=document.getElementById('foot');
+  footEl.hidden=false;
+  var sc =document.getElementById('footScore');
+  var lbl=document.getElementById('footLbl');
+  if(st.done){
+    var pct=Math.round(100*st.correct/st.total);
+    sc.textContent=st.correct+' / '+st.total;
+    lbl.textContent=pct===100?'perfect':pct>=80?'great':pct>=50?'good':'try again';
+  } else {
+    sc.textContent='';lbl.textContent='';
+  }
+  var pb=document.getElementById('btnPrev');
+  var nb=document.getElementById('btnNext');
+  pb.disabled=(cur===0);
+  nb.disabled=(cur===SETS.length-1);
+  nb.className='nbtn'+(st.done?' go':'');
+  nb.textContent=cur===SETS.length-1?(st.done?'reload':'— end —'):'next →';
+
+  /* render math */
+  if(set.context)rk(document.getElementById('ctx_body'));
+  qs.forEach(function(_,qi){
+    rk(document.getElementById('qt_'+qi));
+    if(st.hist[qi])rk(document.getElementById('ex_'+qi));
+  });
+
+  /* enter key + focus */
+  for(var qi=0;qi<qs.length;qi++){
+    (function(q){
+      var inp=document.getElementById('in_'+q);
+      if(inp)inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();submit(si,q);}});
+    })(qi);
+  }
+  for(var qi=0;qi<qs.length;qi++){
+    if(!st.hist[qi]){
+      var inp=document.getElementById('in_'+qi);
+      if(inp&&!inp.disabled)setTimeout(function(){inp.focus();},60);
+      break;
+    }
+  }
+
+  updateProg();
+}
+
+function go(dir){
+  var nx=cur+dir;
+  if(nx<0||nx>=SETS.length){
+    if(dir>0&&cur===SETS.length-1)location.reload();
+    return;
+  }
+  cur=nx;
+  renderSet(cur);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function submit(si,qi){
+  if(si!==cur)return;
+  var st=setStates[si];
+  if(st.hist[qi])return;
+  var inp=document.getElementById('in_'+qi);
+  var fb =document.getElementById('fb_'+qi);
+  var n=parseInt((inp.value||'').trim(),10);
+  if(isNaN(n)){fb.textContent='数字を入力してください';fb.className='fb ng';return;}
+
+  var qs=SETS[si].questions;
+  var correct=(n===qs[qi].answer);
+  st.hist[qi]={correct:correct,val:n};
+
+  inp.className='ans-in '+(correct?'ok':'ng');
+  inp.disabled=true;
+  document.getElementById('sb_'+qi).disabled=true;
+  document.getElementById('sb_'+qi).textContent='done';
+  fb.textContent=correct?'correct':'wrong  (ans: '+qs[qi].answer+')';
+  fb.className='fb '+(correct?'ok':'ng');
+  var ex=document.getElementById('ex_'+qi);
+  ex.classList.add('show');rk(ex);
+
+  /* unlock next */
+  if(qi+1<qs.length){
+    var nxt=document.getElementById('qi_'+(qi+1));
+    if(nxt){
+      nxt.classList.remove('locked');
+      var ni=document.getElementById('in_'+(qi+1));
+      if(ni)setTimeout(function(){ni.focus();},50);
+    }
+  }
+
+  /* set complete? */
+  if(Object.keys(st.hist).length===qs.length&&!st.done){
+    st.done=true;
+    st.correct=Object.values(st.hist).filter(function(h){return h.correct;}).length;
+    st.total=qs.length;
+    /* update footer score */
+    var pct=Math.round(100*st.correct/st.total);
+    document.getElementById('footScore').textContent=st.correct+' / '+st.total;
+    document.getElementById('footLbl').textContent=pct===100?'perfect':pct>=80?'great':pct>=50?'good':'try again';
+    var nb=document.getElementById('btnNext');
+    nb.className='nbtn go';
+    nb.textContent=cur===SETS.length-1?'reload':'next →';
+  }
+
+  updateProg();
+}
+
+/* ── load ── */
+(function(){
+  var m=location.pathname.match(/^\/jikken\/(.+)$/);
+  var setId=m?m[1]:new URLSearchParams(location.search).get('set');
+
+  if(setId){
+    fetch('/api/sets/'+encodeURIComponent(setId))
+      .then(function(r){if(!r.ok)throw new Error('not found');return r.json();})
+      .then(function(set){
+        SETS=[set];
+        setStates=[{hist:{},done:false,correct:0,total:0}];
+        document.getElementById('loadMsg').hidden=true;
+        renderSet(0);
+      })
+      .catch(function(e){document.getElementById('loadMsg').textContent='set not found';});
+  } else {
+    var p=new URLSearchParams(location.search);
+    var n=Math.min(parseInt(p.get('n')||'10',10),30);
+    var subj=p.get('subject')||'';
+    var url='/api/sets?random='+n+'&with_questions=1'+(subj?'&subject='+encodeURIComponent(subj):'');
+    fetch(url)
+      .then(function(r){return r.json();})
+      .then(function(sets){
+        if(!sets||!sets.length){document.getElementById('loadMsg').textContent='no sets found';return;}
+        SETS=sets;
+        setStates=sets.map(function(){return{hist:{},done:false,correct:0,total:0};});
+        document.getElementById('loadMsg').hidden=true;
+        renderSet(0);
+      })
+      .catch(function(e){document.getElementById('loadMsg').textContent='error: '+e.message;});
+  }
+})();
+</script>
+</body>
+</html>
