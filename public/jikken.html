@@ -79,6 +79,17 @@
     .katex-display{overflow-x:auto;overflow-y:hidden}
     .rule-note{font-size:0.6rem;letter-spacing:0.06em;color:var(--faint);margin-bottom:22px;display:flex;align-items:center;gap:6px}
 
+    /* search / filter */
+    .srch-bar{display:flex;gap:8px;margin-bottom:14px}
+    .srch-in{flex:1;background:none;border:none;border-bottom:1px solid var(--border);padding:6px 4px;font-family:'Caveat',cursive;font-size:1rem;color:var(--ink);outline:none}
+    .srch-in::placeholder{color:var(--faint)}
+    .srch-in:focus{border-bottom-color:var(--faint)}
+    .srch-btn{padding:5px 14px;background:none;border:1px solid var(--border);font-family:'Caveat',cursive;font-size:0.85rem;color:var(--ink);cursor:pointer}.srch-btn:hover{border-color:var(--faint)}
+    .mode-row{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;align-items:center}
+    .mode-chip{padding:3px 11px;border:1px solid var(--border);font-family:'Caveat',cursive;font-size:0.78rem;color:var(--faint);cursor:pointer;border-radius:20px;transition:all 0.15s}
+    .mode-chip:hover{border-color:var(--faint);color:var(--ink)}
+    .mode-chip.active{border-color:var(--ink);color:var(--ink);background:var(--ink);color:var(--bg)}
+
     /* rule overlay */
     .rovl{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.16s}
     .rovl.open{opacity:1;pointer-events:auto}
@@ -117,6 +128,13 @@
   </header>
 
   <div class="rule-note">※ 答えはすべて calc rule に基づいて入力 — <button class="rule-btn" onclick="_openRule()">rule ?</button></div>
+
+  <div class="srch-bar" id="srchBar">
+    <input class="srch-in" id="srchIn" placeholder="search sets..." autocomplete="off">
+    <button class="srch-btn" onclick="doSearch()">go</button>
+    <button class="srch-btn" id="reviewBtn" onclick="loadReview()" hidden>review</button>
+  </div>
+  <div class="mode-row" id="modeRow"></div>
 
   <div class="prog" id="progRow" hidden>
     <div class="prog-dots" id="progDots"></div>
@@ -165,11 +183,19 @@ var _openRule;
   document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
 })();
 
+/* ── uuid (anonymous tracking) ── */
+var _uuid=(function(){
+  var k='mb_uuid',v=localStorage.getItem(k);
+  if(!v){v=([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,function(c){return(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16);});localStorage.setItem(k,v);}
+  return v;
+})();
+
 /* ── state ── */
 var SETS=[];
 var cur=0;
 /* setStates[i] = { hist: {qi: {correct,val}}, done: false, correct: 0, total: 0 } */
 var setStates=[];
+var _activeTag='';
 
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
@@ -343,10 +369,111 @@ function submit(si,qi){
     var nb=document.getElementById('btnNext');
     nb.className='nbtn go';
     nb.textContent=cur===SETS.length-1?'reload':'next →';
+    /* record */
+    var sid=SETS[si].id;
+    if(sid){
+      fetch('/api/set-records',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({uuid:_uuid,set_id:sid,score:st.correct,total:st.total})});
+    }
   }
 
   updateProg();
 }
+
+/* ── search / tag / review ── */
+function doSearch(){
+  var q=(document.getElementById('srchIn').value||'').trim();
+  if(!q)return;
+  document.getElementById('loadMsg').textContent='searching...';
+  document.getElementById('loadMsg').hidden=false;
+  document.getElementById('setView').hidden=true;
+  document.getElementById('foot').hidden=true;
+  document.getElementById('progRow').hidden=true;
+  _activeTag='';
+  renderTagChips([]);
+  fetch('/api/sets/search?q='+encodeURIComponent(q)+'&with_questions=0')
+    .then(function(r){return r.json();})
+    .then(function(sets){
+      if(!sets||!sets.length){document.getElementById('loadMsg').textContent='no results';return;}
+      loadSetsById(sets.map(function(s){return s.id;}));
+    });
+}
+
+function selectTag(tag){
+  _activeTag=(tag===_activeTag)?'':tag;
+  renderTagChips(window._allTags||[]);
+  if(!_activeTag){loadRandom();return;}
+  document.getElementById('loadMsg').textContent='loading...';
+  document.getElementById('loadMsg').hidden=false;
+  fetch('/api/sets?tag='+encodeURIComponent(_activeTag)+'&with_questions=1')
+    .then(function(r){return r.json();})
+    .then(function(sets){
+      var arr=sets&&sets.sets?sets.sets:sets;
+      if(!arr||!arr.length){document.getElementById('loadMsg').textContent='no sets with tag "'+_activeTag+'"';return;}
+      initSets(arr);
+    });
+}
+
+function loadReview(){
+  document.getElementById('loadMsg').textContent='loading review...';
+  document.getElementById('loadMsg').hidden=false;
+  fetch('/api/set-records/due?uuid='+encodeURIComponent(_uuid))
+    .then(function(r){return r.json();})
+    .then(function(rows){
+      if(!rows||!rows.length){document.getElementById('loadMsg').textContent='no sets due for review';return;}
+      loadSetsById(rows.map(function(r){return r.set_id;}));
+    });
+}
+
+function loadSetsById(ids){
+  Promise.all(ids.slice(0,20).map(function(id){
+    return fetch('/api/sets/'+encodeURIComponent(id)).then(function(r){return r.json();});
+  })).then(function(sets){
+    initSets(sets.filter(function(s){return s&&s.questions&&s.questions.length;}));
+  });
+}
+
+function loadRandom(){
+  var p=new URLSearchParams(location.search);
+  var n=Math.min(parseInt(p.get('n')||'10',10),30);
+  var subj=p.get('subject')||'';
+  var url='/api/sets?random='+n+'&with_questions=1'+(subj?'&subject='+encodeURIComponent(subj):'');
+  document.getElementById('loadMsg').textContent='loading...';
+  document.getElementById('loadMsg').hidden=false;
+  fetch(url).then(function(r){return r.json();}).then(function(sets){
+    if(!sets||!sets.length){document.getElementById('loadMsg').textContent='no sets found';return;}
+    initSets(sets);
+  });
+}
+
+function initSets(sets){
+  SETS=sets;
+  cur=0;
+  setStates=sets.map(function(){return{hist:{},done:false,correct:0,total:0};});
+  document.getElementById('loadMsg').hidden=true;
+  renderSet(0);
+}
+
+function renderTagChips(tags){
+  var html='';
+  tags.forEach(function(t){
+    var active=t===_activeTag;
+    html+='<button class="mode-chip'+(active?' active':'')+'" onclick="selectTag(\''+t+'\')">'+t+'</button>';
+  });
+  document.getElementById('modeRow').innerHTML=html;
+}
+
+function collectTags(sets){
+  var seen={};
+  sets.forEach(function(s){
+    var ts=[];try{ts=JSON.parse(s.tags||'[]');}catch(e){}
+    ts.forEach(function(t){seen[t]=1;});
+  });
+  return Object.keys(seen).sort();
+}
+
+/* ── keyboard: Enter to search ── */
+document.getElementById('srchIn').addEventListener('keydown',function(e){if(e.key==='Enter')doSearch();});
 
 /* ── load ── */
 (function(){
@@ -357,27 +484,26 @@ function submit(si,qi){
     fetch('/api/sets/'+encodeURIComponent(setId))
       .then(function(r){if(!r.ok)throw new Error('not found');return r.json();})
       .then(function(set){
-        SETS=[set];
-        setStates=[{hist:{},done:false,correct:0,total:0}];
-        document.getElementById('loadMsg').hidden=true;
-        renderSet(0);
+        initSets([set]);
       })
       .catch(function(e){document.getElementById('loadMsg').textContent='set not found';});
   } else {
-    var p=new URLSearchParams(location.search);
-    var n=Math.min(parseInt(p.get('n')||'10',10),30);
-    var subj=p.get('subject')||'';
-    var url='/api/sets?random='+n+'&with_questions=1'+(subj?'&subject='+encodeURIComponent(subj):'');
-    fetch(url)
+    /* check if any sets are due for review → show review button */
+    fetch('/api/set-records/due?uuid='+encodeURIComponent(_uuid))
       .then(function(r){return r.json();})
-      .then(function(sets){
-        if(!sets||!sets.length){document.getElementById('loadMsg').textContent='no sets found';return;}
-        SETS=sets;
-        setStates=sets.map(function(){return{hist:{},done:false,correct:0,total:0};});
-        document.getElementById('loadMsg').hidden=true;
-        renderSet(0);
-      })
-      .catch(function(e){document.getElementById('loadMsg').textContent='error: '+e.message;});
+      .then(function(rows){
+        if(rows&&rows.length){document.getElementById('reviewBtn').hidden=false;}
+      }).catch(function(){});
+
+    /* load all sets once to collect tags */
+    fetch('/api/sets').then(function(r){return r.json();}).then(function(sets){
+      var arr=sets&&sets.sets?sets.sets:(Array.isArray(sets)?sets:[]);
+      var tags=collectTags(arr);
+      window._allTags=tags;
+      renderTagChips(tags);
+    }).catch(function(){});
+
+    loadRandom();
   }
 })();
 </script>

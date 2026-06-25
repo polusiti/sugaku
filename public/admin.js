@@ -2,6 +2,7 @@
 
 var _sets = [];
 var _allProblems = [];
+var _chapters = [];
 var _activeSetId = null;
 var _openProbId = null;  // inline form open for this problem id ('new' for add-new)
 
@@ -37,18 +38,20 @@ function esc(s) {
 
 function showAdmin() {
   document.getElementById('loginWrap').hidden = true;
-  document.getElementById('shell').hidden = false;
+  document.getElementById('manageShell').hidden = false;
   loadAllData();
 }
 
 /* ─── data load ─── */
 async function loadAllData() {
-  var [sets, probs] = await Promise.all([
+  var [sets, probs, chapters] = await Promise.all([
     api('GET', '/api/sets'),
-    api('GET', '/api/problems')
+    api('GET', '/api/problems'),
+    api('GET', '/api/chapters')
   ]);
   _sets = sets || [];
   _allProblems = probs || [];
+  _chapters = chapters || [];
   renderTree();
   if (_activeSetId) selectSet(_activeSetId);
 }
@@ -112,13 +115,15 @@ function renderSetPanel(set) {
   var html = ''
     + '<div class="sp-meta">'
     +   '<span class="sp-id">' + esc(set.id) + '</span>'
-    +   '<select class="sp-sel" id="spSubj">'
+    +   '<select class="sp-sel" id="spSubj" onchange="updateChapterOpts(\'spSubj\',\'spChapter\')">'
     +     opt('1A', set.subject) + opt('2B', set.subject) + opt('3', set.subject)
     +   '</select>'
     +   '<select class="sp-sel" id="spMode">'
     +     opt('standard', set.mode) + opt('basic', set.mode)
     +   '</select>'
+    +   '<select class="sp-sel" id="spChapter">' + chapterOpts(set.subject, set.chapter_id) + '</select>'
     +   '<input class="sp-title" id="spTitle" value="' + esc(set.title) + '" placeholder="title">'
+    +   '<input class="sp-title" id="spTags" style="font-size:0.8rem;width:180px" value="' + esc((JSON.parse(set.tags||'[]')).join(', ')) + '" placeholder="tags: 確率, 数列, ...">'
     +   '<button class="btn btn-sm" onclick="saveSetMeta()">Save</button>'
     + '</div>'
 
@@ -142,6 +147,19 @@ function renderSetPanel(set) {
 
 function opt(val, current) {
   return '<option value="' + val + '"' + (val === current ? ' selected' : '') + '>' + val + '</option>';
+}
+
+function chapterOpts(subject, current) {
+  var opts = '<option value="">-- 章 --</option>';
+  _chapters.filter(function(c) { return c.subject === subject; }).forEach(function(c) {
+    opts += '<option value="' + esc(c.id) + '"' + (c.id === current ? ' selected' : '') + '>' + esc(c.title) + '</option>';
+  });
+  return opts;
+}
+
+function updateChapterOpts(subjSelId, chapterSelId) {
+  var subj = document.getElementById(subjSelId).value;
+  document.getElementById(chapterSelId).innerHTML = chapterOpts(subj, '');
 }
 
 function renderProbRows(probs) {
@@ -292,11 +310,14 @@ async function deleteProblem(id) {
 
 /* ─── set meta save ─── */
 async function saveSetMeta() {
-  var subj    = document.getElementById('spSubj').value;
-  var mode    = document.getElementById('spMode').value;
-  var title   = (document.getElementById('spTitle').value || '').trim();
-  var context = (document.getElementById('ctxTa').value || '').trim();
-  await api('PUT', '/api/sets/' + encodeURIComponent(_activeSetId), {subject: subj, mode: mode, title: title, context: context});
+  var subj      = document.getElementById('spSubj').value;
+  var mode      = document.getElementById('spMode').value;
+  var chapterId = document.getElementById('spChapter').value;
+  var title     = (document.getElementById('spTitle').value || '').trim();
+  var context   = (document.getElementById('ctxTa').value || '').trim();
+  var tagsRaw   = (document.getElementById('spTags').value || '').trim();
+  var tags      = tagsRaw ? tagsRaw.split(',').map(function(t){return t.trim();}).filter(Boolean) : [];
+  await api('PUT', '/api/sets/' + encodeURIComponent(_activeSetId), {subject: subj, mode: mode, chapter_id: chapterId, title: title, context: context, tags: tags});
   await loadAllData();
 }
 
@@ -304,16 +325,20 @@ async function saveSetMeta() {
 function toggleNsForm() {
   var f = document.getElementById('nsForm');
   f.hidden = !f.hidden;
-  if (!f.hidden) document.getElementById('nsId').focus();
+  if (!f.hidden) {
+    document.getElementById('nsId').focus();
+    updateChapterOpts('nsSubj', 'nsChapter');
+  }
 }
 
 async function createSet() {
-  var id      = (document.getElementById('nsId').value || '').trim();
-  var title   = (document.getElementById('nsTitle').value || '').trim();
-  var subject = document.getElementById('nsSubj').value;
-  var mode    = document.getElementById('nsMode').value;
+  var id        = (document.getElementById('nsId').value || '').trim();
+  var title     = (document.getElementById('nsTitle').value || '').trim();
+  var subject   = document.getElementById('nsSubj').value;
+  var mode      = document.getElementById('nsMode').value;
+  var chapterId = document.getElementById('nsChapter').value;
   if (!id) { alert('id required'); return; }
-  await api('POST', '/api/sets', {id, subject, mode, title, context: '', problem_ids: []});
+  await api('POST', '/api/sets', {id, subject, mode, chapter_id: chapterId, title, context: '', problem_ids: []});
   document.getElementById('nsId').value = '';
   document.getElementById('nsTitle').value = '';
   document.getElementById('nsForm').hidden = true;
@@ -441,7 +466,9 @@ function parseMondaiLatex(raw) {
 
   // answer body
   var am = raw.match(/\\begin\{answer\}([\s\S]*?)\\end\{answer\}/);
-  var ansBody = am ? am[1] : '';
+  var ansBody = am ? am[1]
+    .replace(/\\begin\{tikzpicture\}[\s\S]*?\\end\{tikzpicture\}/g, '')
+    .replace(/\\begin\{center\}[\s\S]*?\\end\{center\}/g, '') : '';
 
   // answer body を小問ごとに分割 → explanation & ans expression
   var ansSections = splitAtSubqMarkers(ansBody);
@@ -474,8 +501,12 @@ function parseMondaiLatex(raw) {
 
     // answer section から explanation と答えの式を抽出
     var ansSection = ansSections[i] || '';
-    // 答えの式: answer section 内の最後の $...$ ブロック
-    var exprMatch = ansSection.match(/\$([^$]+)\$(?![\s\S]*\$[^$]+\$)/);
+    // $\star$ N があれば ans を直接確定（最優先）
+    var starMatch = ansSection.match(/\$\\star\$\s*(\d+)/);
+    var starAns = starMatch ? starMatch[1] : '';
+    // 答えの式: $\star$ を除いた後の最後の $...$ ブロック
+    var ansForExpr = ansSection.replace(/\$\\star\$\s*\d+/g, '');
+    var exprMatch = ansForExpr.match(/\$([^$]+)\$(?![\s\S]*\$[^$]+\$)/);
     var ansExpr = '';
     if (exprMatch) {
       var candidate = exprMatch[1];
@@ -484,14 +515,14 @@ function parseMondaiLatex(raw) {
       ansExpr = (eqIdx >= 0 ? candidate.substring(eqIdx + 1) : candidate).trim();
     }
     // explanation: $\star$ N を除去した全文
-    var explanation = ansSection.replace(/\$\\star\$\s*\d+/g, '').trim();
+    var explanation = ansForExpr.trim();
 
     return {
       id: 'p' + String(nextNum + i).padStart(3, '0'),
       type: type,
       q: q,
       ansExpr: ansExpr,
-      ans: '',           // converter で確定する
+      ans: starAns,      // $\star$ N があれば初期値として使用、なければ converter で確定
       explanation: explanation
     };
   });
@@ -689,6 +720,262 @@ function renderPreview(taId, pvId) {
       {left:'\\[', right:'\\]', display:true},
       {left:'$',  right:'$',  display:false},
       {left:'\\(', right:'\\)', display:false}
+    ],
+    throwOnError: false
+  });
+}
+
+/* ═══════════════════════════════════════════
+   Mode: manage / book
+   ═══════════════════════════════════════════ */
+
+var _mode = 'manage';
+var _bookChapters = [];
+var _bookProblems = [];
+var _bookSubject = '1A';
+var _bookChapter = null;
+
+function initApp(mode) {
+  if (mode === 'book') {
+    setMode('book');
+  } else {
+    // manage: ログイン状態を確認
+    var tok = sessionStorage.getItem('mb_admin_token');
+    if (tok) {
+      showAdmin();
+    } else {
+      document.getElementById('loginWrap').hidden = false;
+    }
+    document.getElementById('tabManage').classList.add('active');
+    document.getElementById('tabBook').classList.remove('active');
+  }
+}
+
+function setMode(mode) {
+  _mode = mode;
+  var isBook = mode === 'book';
+
+  document.getElementById('tabManage').classList.toggle('active', !isBook);
+  document.getElementById('tabBook').classList.toggle('active', isBook);
+
+  document.getElementById('loginWrap').hidden = true;
+  document.getElementById('manageShell').hidden = isBook;
+  var bk = document.getElementById('bookShell');
+  if (isBook) {
+    bk.style.display = 'flex';
+    bk.hidden = false;
+    initBook();
+  } else {
+    bk.style.display = 'none';
+    bk.hidden = true;
+    var tok = sessionStorage.getItem('mb_admin_token');
+    if (tok) {
+      document.getElementById('manageShell').hidden = false;
+      loadAllData();
+    } else {
+      document.getElementById('loginWrap').hidden = false;
+    }
+  }
+
+  history.pushState({}, '', isBook ? '/admin/book' : '/admin');
+}
+
+/* ── book: init ── */
+async function initBook() {
+  var [ch, pr] = await Promise.all([
+    fetch('/api/chapters').then(function(r){ return r.json(); }),
+    fetch('/api/problems?status=live').then(function(r){ return r.json(); })
+  ]);
+  _bookChapters = ch || [];
+  _bookProblems = pr || [];
+  renderBookTabs();
+  renderBookSidebar();
+}
+
+/* ── book: subject tabs ── */
+function renderBookTabs() {
+  var order = ['1A','2B','3'];
+  var labels = {'1A':'数学I・A','2B':'数学II・B','3':'数学III'};
+  var subjects = order.filter(function(s) {
+    return _bookChapters.some(function(c){ return c.subject === s; });
+  });
+  var html = subjects.map(function(s) {
+    return '<button class="bk-tab' + (s === _bookSubject ? ' active' : '') + '" onclick="selectBookSubject(\'' + s + '\')">'
+      + (labels[s] || s) + '</button>';
+  }).join('');
+  document.getElementById('bookTabs').innerHTML = html;
+}
+
+function selectBookSubject(s) {
+  _bookSubject = s;
+  _bookChapter = null;
+  renderBookTabs();
+  renderBookSidebar();
+  document.getElementById('bookMain').innerHTML = '<div class="bk-empty">章を選んでください</div>';
+}
+
+/* ── book: chapter sidebar ── */
+function renderBookSidebar() {
+  var chs = _bookChapters.filter(function(c){ return c.subject === _bookSubject; });
+  if (!chs.length) { document.getElementById('bookSb').innerHTML = ''; return; }
+  var labels = {'1A':'数学I・A','2B':'数学II・B','3':'数学III'};
+  var html = '<div class="book-sb-sect">' + esc(labels[_bookSubject] || _bookSubject) + '</div>';
+  chs.forEach(function(c) {
+    var cnt = _bookProblems.filter(function(p){ return p.chapter_id === c.id; }).length;
+    html += '<button class="ch-item' + (c.id === _bookChapter ? ' active' : '') + '" onclick="selectBookChapter(\'' + esc(c.id) + '\')">'
+      + esc(c.title)
+      + '<span class="ch-cnt">' + cnt + '</span>'
+      + '</button>';
+  });
+  document.getElementById('bookSb').innerHTML = html;
+}
+
+function selectBookChapter(chId) {
+  _bookChapter = chId;
+  renderBookSidebar();
+  renderBookMain();
+}
+
+/* ── book: main panel ── */
+function renderBookMain() {
+  var ch = _bookChapters.find(function(c){ return c.id === _bookChapter; });
+  if (!ch) return;
+  var probs = _bookProblems.filter(function(p){ return p.chapter_id === _bookChapter; });
+
+  // set_id でグループ化（set_order 順）
+  var sets = {}, setOrder = [];
+  probs.forEach(function(p) {
+    var sid = p.set_id || p.id;
+    if (!sets[sid]) { sets[sid] = []; setOrder.push(sid); }
+    sets[sid].push(p);
+  });
+  Object.values(sets).forEach(function(arr) {
+    arr.sort(function(a,b){ return (a.set_order||1)-(b.set_order||1); });
+  });
+
+  var html = '<div class="bk-ch-title">' + esc(ch.title) + '</div>';
+  if (!setOrder.length) { html += '<div class="bk-empty">問題なし</div>'; }
+
+  setOrder.forEach(function(sid, i) {
+    var ps = sets[sid];
+    var first = ps[0];
+    var mode = first.mode === 'basic' ? 'basic' : 'standard';
+    var title = bkSetTitle(ps);
+
+    html += '<div class="set-card" id="bksc-' + esc(sid) + '">'
+      + '<div class="set-hd" onclick="bkToggleSet(\'' + esc(sid) + '\')">'
+      +   '<span class="set-num">' + (i+1) + '</span>'
+      +   '<span class="set-title">' + esc(title) + '</span>'
+      +   '<div class="set-meta">'
+      +     '<span class="bk-badge">' + mode + '</span>'
+      +     '<span>' + ps.length + '問</span>'
+      +   '</div>'
+      +   '<span class="set-chev" id="bkchev-' + esc(sid) + '">&#9654;</span>'
+      + '</div>'
+      + '<div class="set-body" id="bksb-' + esc(sid) + '">'
+      + bkRenderSetBody(ps)
+      + '</div>'
+      + '</div>';
+  });
+
+  document.getElementById('bookMain').innerHTML = html;
+  bkRenderKatex(document.getElementById('bookMain'));
+}
+
+function bkSetTitle(ps) {
+  if (ps.length === 1) return ps[0].topic;
+  return ps[0].topic.replace(/\s*\(\d+\)\s*$/, '').trim() || ps[0].topic;
+}
+
+function bkRenderSetBody(ps) {
+  var html = '';
+  ps.forEach(function(p, i) {
+    var isProof = p.type === 'proof';
+    var pid = esc(p.id);
+    html += '<div class="bk-prob-row" id="bkpr-' + pid + '" onclick="bkToggleProb(\'' + pid + '\')">'
+      +   '<div class="bk-subq">'
+      +   (ps.length > 1 ? '<span class="bk-pn">(' + (p.set_order||i+1) + ')</span>' : '')
+      +   '<div class="bk-q' + (isProof ? ' proof' : '') + '">' + bkLatex(p.q) + '</div>'
+      +   '</div>'
+      + '</div>'
+      + '<div class="bk-ans-panel" id="bkap-' + pid + '">'
+      + (isProof
+        ? '<div style="color:var(--faint);font-size:0.8rem">証明問題</div>'
+        : '<div class="bk-ans-row">'
+          + '<input class="bk-ans-in" id="bkai-' + pid + '" type="number" placeholder="?" '
+          + 'onkeydown="if(event.key===\'Enter\')bkCheckAns(\'' + pid + '\',' + (p.answer||0) + ')">'
+          + '<button class="bk-ans-btn" onclick="bkCheckAns(\'' + pid + '\',' + (p.answer||0) + ')">確認</button>'
+          + '<span class="bk-ans-res" id="bkar-' + pid + '"></span>'
+          + '</div>'
+        )
+      + (p.explanation
+        ? '<div class="bk-exp" id="bkae-' + pid + '" style="display:none">' + bkLatex(p.explanation) + '</div>'
+        : '')
+      + '</div>';
+  });
+  return html;
+}
+
+function bkToggleSet(sid) {
+  var body = document.getElementById('bksb-' + sid);
+  var chev = document.getElementById('bkchev-' + sid);
+  var hd   = body.previousElementSibling;
+  var open = body.classList.toggle('open');
+  hd.classList.toggle('open', open);
+  chev.classList.toggle('open', open);
+}
+
+function bkToggleProb(pid) {
+  var ap = document.getElementById('bkap-' + pid);
+  var pr = document.getElementById('bkpr-' + pid);
+  var open = ap.classList.toggle('open');
+  pr.classList.toggle('open', open);
+  ap.style.display = open ? 'block' : 'none';
+  if (open) bkRenderKatex(ap);
+}
+
+function bkCheckAns(pid, correct) {
+  var inp = document.getElementById('bkai-' + pid);
+  var res = document.getElementById('bkar-' + pid);
+  var exp = document.getElementById('bkae-' + pid);
+  var val = parseInt(inp.value, 10);
+  if (isNaN(val)) return;
+  if (val === correct) {
+    inp.className = 'bk-ans-in correct';
+    res.className = 'bk-ans-res correct'; res.textContent = '正解';
+    if (exp) { exp.style.display = 'block'; bkRenderKatex(exp); }
+  } else {
+    inp.className = 'bk-ans-in wrong';
+    res.className = 'bk-ans-res wrong'; res.textContent = '不正解';
+    setTimeout(function(){ inp.className = 'bk-ans-in'; }, 600);
+  }
+  fetch('/api/record', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({uuid: bkUserId(), question_id: pid, answer: val, is_correct: val===correct})
+  }).catch(function(){});
+}
+
+function bkUserId() {
+  var id = localStorage.getItem('mb_uuid');
+  if (!id) { id = crypto.randomUUID(); localStorage.setItem('mb_uuid', id); }
+  return id;
+}
+
+function bkLatex(s) {
+  if (!s) return '';
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function bkRenderKatex(el) {
+  if (!el || typeof renderMathInElement === 'undefined') return;
+  renderMathInElement(el, {
+    delimiters: [
+      {left:'$$',right:'$$',display:true},
+      {left:'\\[',right:'\\]',display:true},
+      {left:'$',right:'$',display:false},
+      {left:'\\(',right:'\\)',display:false}
     ],
     throwOnError: false
   });

@@ -53,7 +53,15 @@ export default {
       }
     }
 
+    /* ── chapters ── */
+    if (url.pathname === '/api/chapters' && request.method === 'GET') {
+      return handleListChapters(request, env);
+    }
+
     /* ── sets CRUD ── */
+    if (url.pathname === '/api/sets/search' && request.method === 'GET') {
+      return handleSearchSets(request, env);
+    }
     if (url.pathname === '/api/sets' && request.method === 'GET') {
       return handleListSets(request, env);
     }
@@ -69,6 +77,14 @@ export default {
       }
     }
 
+    /* ── set-records ── */
+    if (url.pathname === '/api/set-records' && request.method === 'POST') {
+      return handleCreateSetRecord(request, env);
+    }
+    if (url.pathname === '/api/set-records/due' && request.method === 'GET') {
+      return handleSetRecordsDue(request, env);
+    }
+
     /* ── page routing ── */
     const p = url.pathname.toLowerCase();
     if (p.startsWith('/level/')) {
@@ -80,7 +96,7 @@ export default {
     if (p === '/review') {
       return env.ASSETS.fetch(new URL('/review.html', request.url).toString());
     }
-    if (p === '/admin') {
+    if (p === '/admin' || p === '/admin/book') {
       return env.ASSETS.fetch(new URL('/admin.html', request.url).toString());
     }
     if (p === '/jikken' || p.startsWith('/jikken/')) {
@@ -311,15 +327,22 @@ async function handleReview(request, env) {
    ═══════════════════════════════════════════ */
 
 async function handleAdminLogin(request, env) {
+  const h = corsHeaders();
   try {
     const { password } = await request.json();
     if (password === env.ADMIN_TOKEN) {
-      return json({ token: env.ADMIN_TOKEN });
+      return json({ token: env.ADMIN_TOKEN }, 200, h);
     }
-    return json({ error: 'Incorrect' }, 401);
+    return json({ error: 'Incorrect' }, 401, h);
   } catch (e) {
-    return json({ error: e.message }, 400);
+    return json({ error: e.message }, 400, h);
   }
+}
+
+function requireAuth(request, env) {
+  const auth = request.headers.get('Authorization') || '';
+  const token = auth.replace('Bearer ', '').trim();
+  return token && token === env.ADMIN_TOKEN;
 }
 
 /* ═══════════════════════════════════════════
@@ -340,21 +363,27 @@ async function handleListProblems(request, env) {
   if (status)  { conds.push('status=?');  binds.push(status); }
   if (topic)   { conds.push('topic LIKE ?'); binds.push('%' + topic + '%'); }
 
+  const chapter = url.searchParams.get('chapter') || '';
+  const set     = url.searchParams.get('set') || '';
+  if (chapter) { conds.push('chapter_id=?'); binds.push(chapter); }
+  if (set)     { conds.push('set_id=?');     binds.push(set); }
+
   const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
   const { results } = await env.MATHBARKER_DB.prepare(
-    `SELECT id, subject, mode, topic, status, type, q, ans as answer, explanation, created_at FROM problems ${where} ORDER BY created_at DESC, id`
+    `SELECT id, subject, mode, topic, chapter_id, set_id, set_order, status, type, q, ans as answer, explanation, created_at FROM problems ${where} ORDER BY chapter_id, set_id, set_order, id`
   ).bind(...binds).all();
   return json(results, 200, h);
 }
 
 async function handleCreateProblem(request, env) {
   const h = corsHeaders();
+  if (!requireAuth(request, env)) return json({ error: 'Unauthorized' }, 401, h);
   try {
-    const { id, subject, mode, topic, status, type, q, ans, explanation } = await request.json();
+    const { id, subject, mode, topic, status, type, q, ans, explanation, chapter_id, set_id, set_order } = await request.json();
     if (!id || !q || ans === undefined) return json({ error: 'id, q, ans required' }, 400, h);
     await env.MATHBARKER_DB.prepare(
-      'INSERT INTO problems (id,subject,mode,topic,status,type,q,ans,explanation,created_at) VALUES (?,?,?,?,?,?,?,?,?,date(\'now\'))'
-    ).bind(id, subject||'1A', mode||'standard', topic||'', status||'draft', type||'calc', q, ans, explanation||'').run();
+      'INSERT INTO problems (id,subject,mode,topic,status,type,q,ans,explanation,chapter_id,set_id,set_order,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,date(\'now\'))'
+    ).bind(id, subject||'1A', mode||'standard', topic||'', status||'draft', type||'calc', q, ans, explanation||'', chapter_id||'', set_id||'', set_order||1).run();
     return json({ ok: true, id }, 200, h);
   } catch (e) {
     return json({ error: e.message }, 500, h);
@@ -363,10 +392,11 @@ async function handleCreateProblem(request, env) {
 
 async function handleUpdateProblem(request, env, id) {
   const h = corsHeaders();
+  if (!requireAuth(request, env)) return json({ error: 'Unauthorized' }, 401, h);
   try {
     const body = await request.json();
     const sets = [], vals = [];
-    for (const k of ['subject','mode','topic','status','type','q','ans','explanation']) {
+    for (const k of ['subject','mode','topic','chapter_id','set_id','set_order','status','type','q','ans','explanation']) {
       if (body[k] !== undefined) { sets.push(k+'=?'); vals.push(body[k]); }
     }
     if (!sets.length) return json({ error: 'no fields' }, 400, h);
@@ -380,8 +410,26 @@ async function handleUpdateProblem(request, env, id) {
 
 async function handleDeleteProblem(request, env, id) {
   const h = corsHeaders();
+  if (!requireAuth(request, env)) return json({ error: 'Unauthorized' }, 401, h);
   await env.MATHBARKER_DB.prepare('DELETE FROM problems WHERE id=?').bind(id).run();
   return json({ ok: true }, 200, h);
+}
+
+/* ═══════════════════════════════════════════
+   Chapters
+   ═══════════════════════════════════════════ */
+
+async function handleListChapters(request, env) {
+  const h = corsHeaders();
+  const url = new URL(request.url);
+  const subject = url.searchParams.get('subject') || '';
+  const conds = [], binds = [];
+  if (subject) { conds.push('subject=?'); binds.push(subject); }
+  const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
+  const { results } = await env.MATHBARKER_DB.prepare(
+    `SELECT * FROM chapters ${where} ORDER BY subject, order_no`
+  ).bind(...binds).all();
+  return json(results, 200, h);
 }
 
 /* ═══════════════════════════════════════════
@@ -391,18 +439,42 @@ async function handleDeleteProblem(request, env, id) {
 async function handleListSets(request, env) {
   const h = corsHeaders();
   const url = new URL(request.url);
-  const subject = url.searchParams.get('subject') || '';
-  const mode    = url.searchParams.get('mode') || '';
+  const subject    = url.searchParams.get('subject') || '';
+  const mode       = url.searchParams.get('mode') || '';
+  const chapter_id = url.searchParams.get('chapter_id') || '';
+  const randomN    = parseInt(url.searchParams.get('random') || '0', 10);
+  const withQ      = url.searchParams.get('with_questions') === '1';
+
+  const tag = url.searchParams.get('tag') || '';
 
   const conds = [], binds = [];
-  if (subject) { conds.push('subject=?'); binds.push(subject); }
-  if (mode)    { conds.push('mode=?');    binds.push(mode); }
+  if (subject)    { conds.push('subject=?');    binds.push(subject); }
+  if (mode)       { conds.push('mode=?');       binds.push(mode); }
+  if (chapter_id) { conds.push('chapter_id=?'); binds.push(chapter_id); }
+  if (tag)        { conds.push("EXISTS (SELECT 1 FROM json_each(tags) WHERE value=?)"); binds.push(tag); }
+  if (randomN > 0) conds.push("problem_ids != '[]' AND problem_ids != '' AND problem_ids IS NOT NULL");
   const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
+  const order = randomN > 0 ? 'ORDER BY RANDOM()' : 'ORDER BY subject, mode, id';
+  const limit = randomN > 0 ? `LIMIT ${Math.min(randomN, 50)}` : '';
 
   const { results } = await env.MATHBARKER_DB.prepare(
-    `SELECT * FROM sets ${where} ORDER BY subject, mode, id`
+    `SELECT * FROM sets ${where} ${order} ${limit}`
   ).bind(...binds).all();
-  return json(results, 200, h);
+
+  if (!withQ) return json(results, 200, h);
+
+  // with_questions=1: 各setにquestionsを付加して返す
+  const sets = await Promise.all(results.map(async set => {
+    const ids = JSON.parse(set.problem_ids || '[]');
+    if (!ids.length) return { ...set, questions: [] };
+    const ph = ids.map(() => '?').join(',');
+    const { results: probs } = await env.MATHBARKER_DB.prepare(
+      `SELECT id, q, ans as answer, explanation FROM problems WHERE id IN (${ph})`
+    ).bind(...ids).all();
+    const questions = ids.map(pid => probs.find(p => p.id === pid)).filter(Boolean);
+    return { ...set, questions };
+  }));
+  return json(sets, 200, h);
 }
 
 async function handleGetSet(request, env, id) {
@@ -424,13 +496,15 @@ async function handleGetSet(request, env, id) {
 
 async function handleCreateSet(request, env) {
   const h = corsHeaders();
+  if (!requireAuth(request, env)) return json({ error: 'Unauthorized' }, 401, h);
   try {
-    const { id, subject, mode, title, context, problem_ids } = await request.json();
+    const { id, subject, mode, title, context, problem_ids, chapter_id, tags } = await request.json();
     if (!id) return json({ error: 'id required' }, 400, h);
     const pids = JSON.stringify(Array.isArray(problem_ids) ? problem_ids : []);
+    const tgs  = JSON.stringify(Array.isArray(tags) ? tags : []);
     await env.MATHBARKER_DB.prepare(
-      'INSERT INTO sets (id,subject,mode,title,context,problem_ids) VALUES (?,?,?,?,?,?)'
-    ).bind(id, subject||'1A', mode||'standard', title||'', context||'', pids).run();
+      'INSERT INTO sets (id,subject,mode,title,context,problem_ids,chapter_id,tags) VALUES (?,?,?,?,?,?,?,?)'
+    ).bind(id, subject||'1A', mode||'standard', title||'', context||'', pids, chapter_id||'', tgs).run();
     return json({ ok: true, id }, 200, h);
   } catch (e) {
     return json({ error: e.message }, 500, h);
@@ -439,15 +513,20 @@ async function handleCreateSet(request, env) {
 
 async function handleUpdateSet(request, env, id) {
   const h = corsHeaders();
+  if (!requireAuth(request, env)) return json({ error: 'Unauthorized' }, 401, h);
   try {
     const body = await request.json();
     const sets = [], vals = [];
-    for (const k of ['subject','mode','title','context']) {
+    for (const k of ['subject','mode','title','context','chapter_id']) {
       if (body[k] !== undefined) { sets.push(k+'=?'); vals.push(body[k]); }
     }
     if (body.problem_ids !== undefined) {
       sets.push('problem_ids=?');
       vals.push(JSON.stringify(Array.isArray(body.problem_ids) ? body.problem_ids : []));
+    }
+    if (body.tags !== undefined) {
+      sets.push('tags=?');
+      vals.push(JSON.stringify(Array.isArray(body.tags) ? body.tags : []));
     }
     if (!sets.length) return json({ error: 'no fields' }, 400, h);
     vals.push(id);
@@ -460,8 +539,90 @@ async function handleUpdateSet(request, env, id) {
 
 async function handleDeleteSet(request, env, id) {
   const h = corsHeaders();
+  if (!requireAuth(request, env)) return json({ error: 'Unauthorized' }, 401, h);
   await env.MATHBARKER_DB.prepare('DELETE FROM sets WHERE id=?').bind(id).run();
   return json({ ok: true }, 200, h);
+}
+
+/* ═══════════════════════════════════════════
+   Sets search / set-records
+   ═══════════════════════════════════════════ */
+
+async function handleSearchSets(request, env) {
+  const h = corsHeaders();
+  const q = new URL(request.url).searchParams.get('q') || '';
+  if (!q.trim()) return json([], 200, h);
+  try {
+    const { results } = await env.MATHBARKER_DB.prepare(
+      `SELECT s.* FROM sets s
+       JOIN sets_fts f ON s.rowid = f.rowid
+       WHERE sets_fts MATCH ?
+         AND s.problem_ids != '[]' AND s.problem_ids != '' AND s.problem_ids IS NOT NULL
+       ORDER BY rank
+       LIMIT 30`
+    ).bind(q.trim()).all();
+    return json(results, 200, h);
+  } catch (e) {
+    return json({ error: e.message }, 500, h);
+  }
+}
+
+function sm2(correct, prevInterval, prevEase) {
+  const q = correct ? 5 : 2;
+  const ease = Math.max(1.3, prevEase + 0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
+  const interval = q < 3 ? 1 : prevInterval <= 1 ? 6 : Math.round(prevInterval * ease);
+  return { interval, ease };
+}
+
+async function handleCreateSetRecord(request, env) {
+  const h = corsHeaders();
+  try {
+    const { uuid, set_id, score, total } = await request.json();
+    if (!uuid || !set_id) return json({ error: 'uuid and set_id required' }, 400, h);
+
+    const prev = await env.MATHBARKER_DB
+      .prepare('SELECT interval_days, ease FROM set_records WHERE user_uuid=? AND set_id=? ORDER BY id DESC LIMIT 1')
+      .bind(uuid, set_id).first();
+
+    const correct = total > 0 && score / total >= 0.5;
+    const { interval, ease } = sm2(correct, prev?.interval_days ?? 0, prev?.ease ?? 2.5);
+    const due = new Date(Date.now() + interval * 86400000).toISOString().slice(0, 10);
+
+    await env.MATHBARKER_DB.prepare(
+      'INSERT INTO set_records (user_uuid, set_id, score, total, interval_days, ease, due, reviewed_at) VALUES (?,?,?,?,?,?,?,date("now"))'
+    ).bind(uuid, set_id, score ?? 0, total ?? 0, interval, ease, due).run();
+
+    return json({ ok: true, next_review: due, interval_days: interval }, 200, h);
+  } catch (e) {
+    return json({ error: e.message }, 500, h);
+  }
+}
+
+async function handleSetRecordsDue(request, env) {
+  const h = corsHeaders();
+  const uuid = new URL(request.url).searchParams.get('uuid') || '';
+  if (!uuid) return json({ error: 'uuid required' }, 400, h);
+  try {
+    // 最新レコードのみ（set_idごとに1行）でdueが今日以前のもの
+    const { results } = await env.MATHBARKER_DB.prepare(
+      `SELECT sr.set_id, sr.due, sr.score, sr.total, sr.interval_days,
+              s.title, s.subject, s.context, s.problem_ids, s.tags
+       FROM set_records sr
+       JOIN sets s ON s.id = sr.set_id
+       WHERE sr.user_uuid = ?
+         AND sr.id = (
+           SELECT MAX(id) FROM set_records
+           WHERE user_uuid = sr.user_uuid AND set_id = sr.set_id
+         )
+         AND sr.due <= date('now')
+         AND s.problem_ids != '[]' AND s.problem_ids != '' AND s.problem_ids IS NOT NULL
+       ORDER BY sr.due ASC
+       LIMIT 20`
+    ).bind(uuid).all();
+    return json(results, 200, h);
+  } catch (e) {
+    return json({ error: e.message }, 500, h);
+  }
 }
 
 /* ═══════════════════════════════════════════ */
