@@ -552,6 +552,9 @@ async function handleSearchSets(request, env) {
   const h = corsHeaders();
   const q = new URL(request.url).searchParams.get('q') || '';
   if (!q.trim()) return json([], 200, h);
+  // スペース区切りをANDに変換 (trigram tokenizer対応)
+  const terms = q.trim().split(/\s+/).filter(Boolean);
+  const matchExpr = terms.map(t => '"' + t.replace(/"/g, '') + '"').join(' AND ');
   try {
     const { results } = await env.MATHBARKER_DB.prepare(
       `SELECT s.* FROM sets s
@@ -560,7 +563,7 @@ async function handleSearchSets(request, env) {
          AND s.problem_ids != '[]' AND s.problem_ids != '' AND s.problem_ids IS NOT NULL
        ORDER BY rank
        LIMIT 30`
-    ).bind(q.trim()).all();
+    ).bind(matchExpr).all();
     return json(results, 200, h);
   } catch (e) {
     return json({ error: e.message }, 500, h);
